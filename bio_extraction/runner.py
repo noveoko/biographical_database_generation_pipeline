@@ -48,6 +48,7 @@ from bio_extraction.contracts import (
     ExtractionResult,
     LayoutResult,
     OCRResult,
+    DocumentSource,
     PhaseOneInput,
     ResolutionResult,
 )
@@ -108,15 +109,13 @@ class PipelineRunner:
         # One queue between each pair of consecutive phases.
         # queues[i] feeds INTO phases[i] (i.e. it contains the OUTPUT of phases[i-1]).
         # queues[0] is populated by the runner with PhaseOneInput seeds.
-        self._queues: list[queue.Queue[BaseModel]] = [
-            queue.Queue() for _ in range(len(phases) + 1)
-        ]
+        self._queues: list[queue.Queue[BaseModel]] = [queue.Queue() for _ in range(len(phases) + 1)]
 
     # ------------------------------------------------------------------
     # Input seeding
     # ------------------------------------------------------------------
 
-    def _seed_phase1_inputs(self) -> int:
+    def _seed_phase1_inputs(self) -> int:  # FIX: was un-indented (defined at module level)
         """
         Enumerate documents and push PhaseOneInput objects into queues[0].
 
@@ -130,21 +129,16 @@ class PipelineRunner:
             if not input_dir.is_dir():
                 logger.warning(f"input_dir does not exist or is not a directory: {input_dir}")
                 return 0
+
+            # Sort files to ensure deterministic processing
             for pdf_path in sorted(input_dir.glob("*.pdf")):
-                self._queues[0].put(
-                    PhaseOneInput(source="local", local_path=pdf_path)
-                )
+                self._queues[0].put(PhaseOneInput(source=DocumentSource.LOCAL, local_path=pdf_path))
                 count += 1
             logger.info(f"Seeded {count} local PDF(s) from {input_dir}")
 
         elif source == "commoncrawl":
             # Phase 1 implementation handles CC enumeration internally.
-            # The runner injects a single sentinel that tells Phase 1 to start
-            # its own CC index walk.  Phase 1 is responsible for yielding
-            # multiple AcquisitionResult objects.
-            # For now we push one PhaseOneInput with cc_warc_record=None
-            # as a trigger; the stub will raise NotImplementedError.
-            self._queues[0].put(PhaseOneInput(source="commoncrawl", cc_warc_record={}))
+            self._queues[0].put(PhaseOneInput(source=DocumentSource.COMMONCRAWL, cc_warc_record={}))
             count = 1
             logger.info("Seeded CC acquisition trigger")
 

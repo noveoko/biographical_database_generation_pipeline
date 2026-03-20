@@ -58,10 +58,10 @@ from bio_extraction.utilities.pattern_cache import PatternCache
 
 # Pre-compiled substitution patterns for fingerprint generation (compiled once
 # at import time for performance).
-_RE_UPPERCASE_WORD = re.compile(r"\b[A-ZŁŚŹŻĆŃÓĄ]{2,}\b")   # ≥2 uppercase letters
-_RE_FOUR_DIGIT     = re.compile(r"\b\d{4}\b")                  # exactly 4 digits (year)
-_RE_SHORT_DIGIT    = re.compile(r"\b\d{1,2}\b")                # 1–2 digit numbers
-_RE_LOWERCASE_WORD = re.compile(r"\b[a-złśźżćńóą]{2,}\b")     # ≥2 lowercase letters
+_RE_UPPERCASE_WORD = re.compile(r"\b[A-ZŁŚŹŻĆŃÓĄ]{2,}\b")  # ≥2 uppercase letters
+_RE_FOUR_DIGIT = re.compile(r"\b\d{4}\b")  # exactly 4 digits (year)
+_RE_SHORT_DIGIT = re.compile(r"\b\d{1,2}\b")  # 1–2 digit numbers
+_RE_LOWERCASE_WORD = re.compile(r"\b[a-złśźżćńóą]{2,}\b")  # ≥2 lowercase letters
 
 
 def _compute_fingerprint(text: str) -> str:
@@ -179,7 +179,7 @@ class ExtractionPhase(PhaseProtocol[OCRResult, ExtractionResult]):
     ) -> None:
         self._log = get_phase_logger(self.phase_name)
         settings = get_settings()
-        self._cfg = settings.extraction   # sub-config block for this phase
+        self._cfg = settings.extraction  # sub-config block for this phase
 
         self._cache: PatternCache = pattern_cache or PatternCache()
         self._bloom: SurnameBloomFilter = bloom_filter or SurnameBloomFilter()
@@ -371,15 +371,11 @@ class ExtractionPhase(PhaseProtocol[OCRResult, ExtractionResult]):
         surname = groups.get("surname", "").strip()
 
         if not surname:
-            self._log.debug(
-                "slice=%s — cached pattern matched but extracted no surname", slice_id
-            )
+            self._log.debug("slice=%s — cached pattern matched but extracted no surname", slice_id)
             return None
 
         if not self._bloom.check(surname):
-            self._log.debug(
-                "slice=%s — surname '%s' rejected by bloom filter", slice_id, surname
-            )
+            self._log.debug("slice=%s — surname '%s' rejected by bloom filter", slice_id, surname)
             return None
 
         self._log.debug("slice=%s — cache hit (fingerprint=%s)", slice_id, fingerprint)
@@ -709,35 +705,35 @@ class ExtractionPhase(PhaseProtocol[OCRResult, ExtractionResult]):
         doc_id: str,
     ) -> dict[str, Any]:
         """
-        Parse the LLM response string into a Python dictionary.
+                Parse the LLM response string into a Python dictionary.
 
-        Three recovery strategies are attempted in sequence:
+                Three recovery strategies are attempted in sequence:
 
-        1. **Direct parse** — the LLM correctly followed instructions and
-           the string is already valid JSON.
-        2. **Fenced code block** — extract content between ``\`\`\`json`` and
-           ``\`\`\``` markers.
-        3. **Brace extraction** — find the first ``{`` and last ``}`` and
-           attempt to parse the substring.
+                1. **Direct parse** — the LLM correctly followed instructions and
+                   the string is already valid JSON.
+                2. **Fenced code block** — extract content between ```json and
+        ``` markers.
+                3. **Brace extraction** — find the first ``{`` and last ``}`` and
+                   attempt to parse the substring.
 
-        Parameters
-        ----------
-        raw:
-            Raw string returned by ``_call_ollama``.
-        slice_id, doc_id:
-            Traceability context for any ``ExtractionError``.
+                Parameters
+                ----------
+                raw:
+                    Raw string returned by ``_call_ollama``.
+                slice_id, doc_id:
+                    Traceability context for any ``ExtractionError``.
 
-        Returns
-        -------
-        dict[str, Any]
-            A dictionary guaranteed to contain at least the keys from the
-            extraction prompt (values may be ``None`` or empty lists if the
-            LLM omitted them).
+                Returns
+                -------
+                dict[str, Any]
+                    A dictionary guaranteed to contain at least the keys from the
+                    extraction prompt (values may be ``None`` or empty lists if the
+                    LLM omitted them).
 
-        Raises
-        ------
-        ExtractionError
-            When all three strategies fail.
+                Raises
+                ------
+                ExtractionError
+                    When all three strategies fail.
         """
         # Strategy 1: direct parse
         try:
@@ -823,7 +819,7 @@ class ExtractionPhase(PhaseProtocol[OCRResult, ExtractionResult]):
 
         # -- locations / roles: may arrive as comma-joined str or list
         locations = _coerce_to_list(groups.get("locations"))
-        roles     = _coerce_to_list(groups.get("roles"))
+        roles = _coerce_to_list(groups.get("roles"))
 
         return PersonEntity(
             entity_id=str(uuid.uuid4()),
@@ -866,12 +862,12 @@ def _normalise_extraction(data: Any) -> dict[str, Any]:
     if not isinstance(data, dict):
         raise ValueError(f"Expected dict from LLM, got {type(data)}")
     return {
-        "surname":     data.get("surname"),
+        "surname": data.get("surname"),
         "given_names": data.get("given_names") or [],
-        "birth_date":  data.get("birth_date"),
-        "death_date":  data.get("death_date"),
-        "locations":   data.get("locations") or [],
-        "roles":       data.get("roles") or [],
+        "birth_date": data.get("birth_date"),
+        "death_date": data.get("death_date"),
+        "locations": data.get("locations") or [],
+        "roles": data.get("roles") or [],
     }
 
 
@@ -926,7 +922,6 @@ if __name__ == "__main__":
     or:
         python phase5_extraction.py
     """
-    from datetime import datetime, timezone
 
     print("=== Phase 5 smoke test ===\n")
 
@@ -975,7 +970,9 @@ if __name__ == "__main__":
     assert entity.locations == ["Warszawa"]
     assert entity.roles == ["notariusz"]
     assert entity.extraction_method == ExtractionMethod.REGEX_CACHED
-    print(f"[OK] PersonEntity assembled correctly: {entity.surname}, {entity.given_names}, born {entity.birth_date}")
+    print(
+        f"[OK] PersonEntity assembled correctly: {entity.surname}, {entity.given_names}, born {entity.birth_date}"
+    )
 
     # --- 4. Helper utilities ------------------------------------------------
     assert _coerce_to_list("Warszawa, Kraków") == ["Warszawa", "Kraków"]

@@ -17,7 +17,6 @@ validators defined in ``contracts.py``.
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 from pathlib import Path
@@ -102,9 +101,7 @@ class CheckpointEngine:
         logger.debug("Checkpoint saved", extra={"phase_name": phase_name, "doc_id": doc_id})
         return target
 
-    def load(
-        self, phase_name: str, doc_id: str, model_class: type[T]
-    ) -> T | None:
+    def load(self, phase_name: str, doc_id: str, model_class: type[T]) -> T | None:
         """
         Deserialise a checkpoint back into a Pydantic model.
 

@@ -3,9 +3,16 @@ pyyaml>=6.0
 pytesseract>=0.3.10
 Pillow>=10.0
 requests>=2.31
+pymupdf>=1.27.2.2
+mmh3>=5.2.1
+warcio>=1.7.5
+bitarray>=3.8.0
+numpy>=2.4.3
 
 [dev]
 pytest>=7.4
 pytest-cov>=4.1
-ruff>=0.1
+ruff>=0.4
 mypy>=1.5
+pre-commit>=3.7
+types-PyYAML>=6.0

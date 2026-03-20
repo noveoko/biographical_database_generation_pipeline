@@ -148,7 +148,7 @@ if __name__ == "__main__":
     bf.train(surnames)
 
     print("Check Kowalski:", bf.check("Kowalski"))  # True
-    print("Check Unknown:", bf.check("Xyzabc"))     # Likely False
+    print("Check Unknown:", bf.check("Xyzabc"))  # Likely False
 
     print("Batch hit rate:", bf.check_batch(["Kowalski", "Xyzabc"]))
 

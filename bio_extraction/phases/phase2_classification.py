@@ -1,7 +1,7 @@
 # REQUIRES: pymupdf
 import re
 from datetime import datetime, timezone
-from typing import Optional, List, Tuple, Dict, Any
+from typing import List, Tuple, Dict, Any
 
 import fitz  # PyMuPDF
 
@@ -15,7 +15,7 @@ from bio_extraction.config import get_settings
 class ClassificationPhase(PhaseProtocol[AcquisitionResult, ClassificationResult]):
     """
     Phase 2: Document Classification.
-    
+
     Classifies an acquired PDF into DIRECTORY, NEWSPAPER, CIVIL_RECORD, or UNKNOWN
     using rule-based structural and textual heuristics on sampled pages.
     """
@@ -27,15 +27,16 @@ class ClassificationPhase(PhaseProtocol[AcquisitionResult, ClassificationResult]
 
         # Pre-compile regexes for textual density analysis
         # SURNAME, Name (e.g., KOWALSKI, Jan)
-        self.re_surname_name = re.compile(r'\b[A-ZĄĆĘŁŃÓŚŹŻ]{2,},\s+[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+\b')
+        self.re_surname_name = re.compile(
+            r"\b[A-ZĄĆĘŁŃÓŚŹŻ]{2,},\s+[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+\b"
+        )
         # Dates (e.g., ur. 1890, zm. 1945, *1890, †1945)
-        self.re_dates = re.compile(r'(?:ur\.|zm\.|[*†])\s*\d{4}')
+        self.re_dates = re.compile(r"(?:ur\.|zm\.|[*†])\s*\d{4}")
         # Address fragments (e.g., ul., pl., al.)
-        self.re_addresses = re.compile(r'\b(?:ul\.|pl\.|al\.)\b', re.IGNORECASE)
+        self.re_addresses = re.compile(r"\b(?:ul\.|pl\.|al\.)\b", re.IGNORECASE)
         # Section keywords for civil records
         self.re_keywords = re.compile(
-            r'\b(?:SPIS|KSIĘGA|REJESTR|ZGONÓW|URODZEŃ|MAŁŻEŃSTW)\b', 
-            re.IGNORECASE
+            r"\b(?:SPIS|KSIĘGA|REJESTR|ZGONÓW|URODZEŃ|MAŁŻEŃSTW)\b", re.IGNORECASE
         )
 
     @property
@@ -46,13 +47,13 @@ class ClassificationPhase(PhaseProtocol[AcquisitionResult, ClassificationResult]
     def run(self, input_data: AcquisitionResult) -> ClassificationResult | None:
         """
         Executes the classification phase on a single acquired document.
-        
+
         Args:
             input_data: The AcquisitionResult containing the PDF bytes and metadata.
-            
+
         Returns:
             A ClassificationResult if classified as DIRECTORY, otherwise None.
-        
+
         Raises:
             PhaseError: If the PDF is inherently corrupt or cannot be parsed.
         """
@@ -67,7 +68,9 @@ class ClassificationPhase(PhaseProtocol[AcquisitionResult, ClassificationResult]
         except fitz.FileDataError as e:
             raise PhaseError(self.phase_name, input_data.doc_id, f"Corrupt PDF data: {e}") from e
         except Exception as e:
-            raise PhaseError(self.phase_name, input_data.doc_id, f"Unexpected error opening PDF: {e}") from e
+            raise PhaseError(
+                self.phase_name, input_data.doc_id, f"Unexpected error opening PDF: {e}"
+            ) from e
 
         num_pages = len(doc)
         if num_pages == 0:
@@ -87,7 +90,7 @@ class ClassificationPhase(PhaseProtocol[AcquisitionResult, ClassificationResult]
         for page_idx in sampled_indices:
             page = doc[page_idx]
             features = self._extract_features_from_page(page)
-            
+
             total_entry_density += features["entry_density"]
             max_columns = max(max_columns, features["column_count"])
             if features["table_structure"]:
@@ -99,7 +102,7 @@ class ClassificationPhase(PhaseProtocol[AcquisitionResult, ClassificationResult]
 
         # Average entry density across sampled pages
         avg_entry_density = total_entry_density / len(sampled_indices)
-        
+
         self.logger.debug(
             f"Doc {input_data.doc_id} features - Avg density: {avg_entry_density:.2f}, "
             f"Max cols: {max_columns}, Table: {has_table}, Civil kws: {has_civil_keywords}"
@@ -109,15 +112,19 @@ class ClassificationPhase(PhaseProtocol[AcquisitionResult, ClassificationResult]
             avg_entry_density, max_columns, has_table, has_civil_keywords
         )
 
-        self.logger.info(f"Document {input_data.doc_id} classified as {doc_type.value} with {confidence} confidence.")
+        self.logger.info(
+            f"Document {input_data.doc_id} classified as {doc_type.value} with {confidence} confidence."
+        )
 
         # Discard rules based on MVP specification
         if doc_type == DocumentType.UNKNOWN:
             self.logger.info(f"Discarding {input_data.doc_id}: Classified as UNKNOWN.")
             return None
-            
+
         if doc_type in (DocumentType.NEWSPAPER, DocumentType.CIVIL_RECORD):
-            self.logger.warning(f"Discarding {input_data.doc_id}: Document type '{doc_type.value}' is not yet supported.")
+            self.logger.warning(
+                f"Discarding {input_data.doc_id}: Document type '{doc_type.value}' is not yet supported."
+            )
             return None
 
         return ClassificationResult(
@@ -125,7 +132,7 @@ class ClassificationPhase(PhaseProtocol[AcquisitionResult, ClassificationResult]
             doc_type=doc_type,
             confidence=confidence,
             sample_page_indices=sampled_indices,
-            classified_at=datetime.now(timezone.utc)
+            classified_at=datetime.now(timezone.utc),
         )
 
     def _get_sample_indices(self, num_pages: int) -> List[int]:
@@ -140,12 +147,12 @@ class ClassificationPhase(PhaseProtocol[AcquisitionResult, ClassificationResult]
     def _extract_features_from_page(self, page: fitz.Page) -> Dict[str, Any]:
         """Extracts structural and textual features from a single PyMuPDF page."""
         text = page.get_text()
-        
+
         return {
             "column_count": self._estimate_column_count(page),
             "entry_density": self._calculate_entry_density(text),
             "table_structure": self._detect_table_structure(page),
-            "keywords_present": bool(self.re_keywords.search(text))
+            "keywords_present": bool(self.re_keywords.search(text)),
         }
 
     def _estimate_column_count(self, page: fitz.Page) -> int:
@@ -157,25 +164,25 @@ class ClassificationPhase(PhaseProtocol[AcquisitionResult, ClassificationResult]
             pix = page.get_pixmap(dpi=150, colorspace=fitz.csGRAY)
             width, height = pix.width, pix.height
             samples = pix.samples
-            
+
             col_sums = [0] * width
-            
+
             # Sum ink density per column (0 = black ink, 255 = white background)
             for y in range(height):
                 row_offset = y * width
                 for x in range(width):
-                    col_sums[x] += (255 - samples[row_offset + x])
-                    
+                    col_sums[x] += 255 - samples[row_offset + x]
+
             if not col_sums:
                 return 1
 
             max_sum = max(col_sums)
             # Threshold to consider a column "ink-heavy" vs a "gutter"
-            threshold = max_sum * 0.15 
-            
+            threshold = max_sum * 0.15
+
             columns = 0
             in_column = False
-            
+
             for val in col_sums:
                 if val > threshold:
                     if not in_column:
@@ -183,9 +190,9 @@ class ClassificationPhase(PhaseProtocol[AcquisitionResult, ClassificationResult]
                         columns += 1
                 else:
                     in_column = False
-                    
+
             return max(1, columns)
-            
+
         except Exception as e:
             self.logger.warning(f"Column estimation failed on page {page.number}: {e}")
             return 1
@@ -195,21 +202,21 @@ class ClassificationPhase(PhaseProtocol[AcquisitionResult, ClassificationResult]
         surname_matches = len(self.re_surname_name.findall(text))
         date_matches = len(self.re_dates.findall(text))
         address_matches = len(self.re_addresses.findall(text))
-        
+
         return surname_matches + date_matches + address_matches
 
     def _detect_table_structure(self, page: fitz.Page) -> bool:
         """Detects tables by counting orthogonal line/rect drawings on the page."""
         drawings = page.get_drawings()
         line_segments = 0
-        
+
         for d in drawings:
             for item in d.get("items", []):
                 if item[0] in ("l", "re"):  # 'l' = line, 're' = rectangle
                     line_segments += 1
-                    
+
         # Arbitrary threshold to differentiate tables from basic design lines
-        return line_segments > 15 
+        return line_segments > 15
 
     def _score_heuristic(
         self, avg_density: float, max_cols: int, has_table: bool, has_civil_keywords: bool
@@ -219,16 +226,16 @@ class ClassificationPhase(PhaseProtocol[AcquisitionResult, ClassificationResult]
         """
         if avg_density > 5 and max_cols >= 2:
             return DocumentType.DIRECTORY, 0.95
-            
+
         if avg_density > 2:
             return DocumentType.DIRECTORY, 0.70
-            
+
         if has_table and has_civil_keywords:
             return DocumentType.CIVIL_RECORD, 0.85
-            
+
         if max_cols >= 3 and avg_density <= 2:
             return DocumentType.NEWSPAPER, 0.80
-            
+
         return DocumentType.UNKNOWN, 0.0
 
 
@@ -243,12 +250,21 @@ if __name__ == "__main__":
 
     # 1. Mock the specific bio_extraction modules layout
     class MockConfig:
-        def __getattr__(self, name): return None
+        def __getattr__(self, name):
+            return None
+
     class MockLogger:
-        def info(self, msg): print(f"INFO: {msg}")
-        def warning(self, msg): print(f"WARN: {msg}")
-        def debug(self, msg): print(f"DEBUG: {msg}")
-        def error(self, msg): print(f"ERROR: {msg}")
+        def info(self, msg):
+            print(f"INFO: {msg}")
+
+        def warning(self, msg):
+            print(f"WARN: {msg}")
+
+        def debug(self, msg):
+            print(f"DEBUG: {msg}")
+
+        def error(self, msg):
+            print(f"ERROR: {msg}")
 
     # Enums matching contracts.py
     class DocumentType(enum.Enum):
@@ -272,8 +288,11 @@ if __name__ == "__main__":
 
     class MockPhaseProtocol:
         @property
-        def phase_name(self): return "mock_phase"
-        def run(self, input_data): pass
+        def phase_name(self):
+            return "mock_phase"
+
+        def run(self, input_data):
+            pass
 
     class MockPhaseError(Exception):
         def __init__(self, phase_name: str, doc_id: str, message: str) -> None:
@@ -282,34 +301,38 @@ if __name__ == "__main__":
             super().__init__(f"[{phase_name}] doc={doc_id}: {message}")
 
     # Injecting mocks into sys.modules
-    sys.modules['bio_extraction'] = type('MockPackage', (), {})()
-    sys.modules['bio_extraction.contracts'] = type('MockContracts', (), {
-        'AcquisitionResult': MockAcquisitionResult,
-        'ClassificationResult': MockClassificationResult,
-        'DocumentType': DocumentType
-    })()
-    sys.modules['bio_extraction.protocol'] = type('MockProtocol', (), {
-        'PhaseProtocol': MockPhaseProtocol
-    })()
-    sys.modules['bio_extraction.exceptions'] = type('MockExceptions', (), {
-        'PhaseError': MockPhaseError
-    })()
-    sys.modules['bio_extraction.logging_config'] = type('MockLog', (), {
-        'get_phase_logger': lambda name: MockLogger()
-    })()
-    sys.modules['bio_extraction.config'] = type('MockConf', (), {
-        'get_settings': lambda: MockConfig()
-    })()
+    sys.modules["bio_extraction"] = type("MockPackage", (), {})()
+    sys.modules["bio_extraction.contracts"] = type(
+        "MockContracts",
+        (),
+        {
+            "AcquisitionResult": MockAcquisitionResult,
+            "ClassificationResult": MockClassificationResult,
+            "DocumentType": DocumentType,
+        },
+    )()
+    sys.modules["bio_extraction.protocol"] = type(
+        "MockProtocol", (), {"PhaseProtocol": MockPhaseProtocol}
+    )()
+    sys.modules["bio_extraction.exceptions"] = type(
+        "MockExceptions", (), {"PhaseError": MockPhaseError}
+    )()
+    sys.modules["bio_extraction.logging_config"] = type(
+        "MockLog", (), {"get_phase_logger": lambda name: MockLogger()}
+    )()
+    sys.modules["bio_extraction.config"] = type(
+        "MockConf", (), {"get_settings": lambda: MockConfig()}
+    )()
 
     # Apply to globals so the script parses successfully when run natively
-    globals()['AcquisitionResult'] = MockAcquisitionResult
-    globals()['ClassificationResult'] = MockClassificationResult
-    globals()['DocumentType'] = DocumentType
-    globals()['PhaseProtocol'] = MockPhaseProtocol
-    globals()['PhaseError'] = MockPhaseError
+    globals()["AcquisitionResult"] = MockAcquisitionResult
+    globals()["ClassificationResult"] = MockClassificationResult
+    globals()["DocumentType"] = DocumentType
+    globals()["PhaseProtocol"] = MockPhaseProtocol
+    globals()["PhaseError"] = MockPhaseError
 
     print("--- Running Smoke Test ---")
-    
+
     # Create a minimal valid synthetic PDF using fitz
     test_doc = fitz.open()
     page = test_doc.new_page()
@@ -322,11 +345,11 @@ if __name__ == "__main__":
     test_doc.close()
 
     acq_data = MockAcquisitionResult(doc_id="doc_123_test", pdf_bytes=pdf_bytes)
-    
+
     # Run Phase
     phase = ClassificationPhase()
     result = phase.run(acq_data)
-    
+
     print("\n--- Output ---")
     if result:
         print(f"Success! Document ID: {result.doc_id}")

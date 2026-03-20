@@ -70,12 +70,12 @@ from bio_extraction.protocol import PhaseProtocol
 # Constants (algorithm hyper-parameters that are *not* user-configurable)
 # ---------------------------------------------------------------------------
 
-_SAUVOLA_WINDOW_SIZE: int = 25      # must be odd; matches spec
-_SAUVOLA_K: float = 0.15            # Sauvola sensitivity parameter
-_DESKEW_RANGE_DEG: float = 5.0      # sweep ±5°
-_DESKEW_STEP_DEG: float = 0.5       # resolution of sweep
-_MEDIAN_KERNEL: int = 3             # square kernel for median denoise
-_TESSERACT_CONFIG: str = "--oem 3 --psm 6"   # LSTM engine, uniform text block
+_SAUVOLA_WINDOW_SIZE: int = 25  # must be odd; matches spec
+_SAUVOLA_K: float = 0.15  # Sauvola sensitivity parameter
+_DESKEW_RANGE_DEG: float = 5.0  # sweep ±5°
+_DESKEW_STEP_DEG: float = 0.5  # resolution of sweep
+_MEDIAN_KERNEL: int = 3  # square kernel for median denoise
+_TESSERACT_CONFIG: str = "--oem 3 --psm 6"  # LSTM engine, uniform text block
 
 
 # ---------------------------------------------------------------------------
@@ -259,7 +259,7 @@ class OCRPhase(PhaseProtocol[LayoutResult, OCRResult]):
         stricter threshold, useful for high-contrast prints.
         """
         grey = image.convert("L")
-        arr = np.array(grey, dtype=np.uint8)
+        _arr = np.array(grey, dtype=np.uint8)
         thresh = threshold_sauvola(arr, window_size=_SAUVOLA_WINDOW_SIZE, k=_SAUVOLA_K)
         binary = (arr > thresh).astype(np.uint8) * 255  # white text regions = 255
         # Invert so text is black on white (Tesseract convention)
@@ -283,7 +283,7 @@ class OCRPhase(PhaseProtocol[LayoutResult, OCRResult]):
         Only angles in [-5°, +5°] are considered — larger corrections indicate
         a layout problem, not a scan artefact.
         """
-        arr = np.array(image, dtype=np.float32)
+        _arr = np.array(image, dtype=np.float32)
         angles = np.arange(-_DESKEW_RANGE_DEG, _DESKEW_RANGE_DEG + 1e-9, _DESKEW_STEP_DEG)
 
         best_angle: float = 0.0
@@ -358,14 +358,14 @@ class OCRPhase(PhaseProtocol[LayoutResult, OCRResult]):
         for i in range(n_boxes):
             conf = int(raw["conf"][i])
             word = str(raw["text"][i]).strip()
-            if conf < 0 or not word:   # skip whitespace / non-text tokens
+            if conf < 0 or not word:  # skip whitespace / non-text tokens
                 continue
             words.append(word)
             confidences.append(float(conf) / 100.0)  # normalise 0–100 → 0–1
 
-            left   = int(raw["left"][i])
-            top    = int(raw["top"][i])
-            width  = int(raw["width"][i])
+            left = int(raw["left"][i])
+            top = int(raw["top"][i])
+            width = int(raw["width"][i])
             height = int(raw["height"][i])
             bboxes.append((left, top, left + width, top + height))
 
@@ -438,7 +438,7 @@ if __name__ == "__main__":
     from datetime import datetime, timezone
     from io import BytesIO
 
-    from PIL import Image, ImageDraw, ImageFont
+    from PIL import Image, ImageDraw
 
     from bio_extraction.contracts import (
         ContentSlice,
@@ -473,7 +473,7 @@ if __name__ == "__main__":
         page_num=0,
         entry_index=1,
         bbox=(0, 70, 300, 130),
-        image_bytes=None,   # intentionally empty — should be skipped
+        image_bytes=None,  # intentionally empty — should be skipped
     )
 
     layout = LayoutResult(

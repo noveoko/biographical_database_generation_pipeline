@@ -18,7 +18,6 @@ to force a re-read (useful in tests).
 
 from __future__ import annotations
 
-import functools
 from pathlib import Path
 from typing import Any
 
@@ -34,25 +33,45 @@ from bio_extraction.exceptions import ConfigError
 
 class CommonCrawlSettings(BaseModel):
     index_url: str = Field(description="Base URL of the Common Crawl CDX/Index API endpoint.")
-    query_domains: list[str] = Field(description="Domains to filter for when querying the CC index.")
-    mime_filter: str = Field(description="MIME type filter passed to the CC index query (e.g. 'application/pdf').")
+    query_domains: list[str] = Field(
+        description="Domains to filter for when querying the CC index."
+    )
+    mime_filter: str = Field(
+        description="MIME type filter passed to the CC index query (e.g. 'application/pdf')."
+    )
 
 
 class OCRSettings(BaseModel):
-    confidence_threshold: float = Field(ge=0.0, le=1.0, description="Minimum Tesseract confidence to accept a slice without flagging for review.")
-    tesseract_langs: str = Field(description="Tesseract language string passed via -l (e.g. 'pol+pol_frak').")
+    confidence_threshold: float = Field(
+        ge=0.0,
+        le=1.0,
+        description="Minimum Tesseract confidence to accept a slice without flagging for review.",
+    )
+    tesseract_langs: str = Field(
+        description="Tesseract language string passed via -l (e.g. 'pol+pol_frak')."
+    )
 
 
 class ExtractionSettings(BaseModel):
-    ollama_model: str = Field(description="Ollama model tag used for LLM-assisted extraction (e.g. 'mistral:7b').")
+    ollama_model: str = Field(
+        description="Ollama model tag used for LLM-assisted extraction (e.g. 'mistral:7b')."
+    )
     ollama_url: str = Field(description="Base URL of the local Ollama inference server.")
     bloom_filter_path: Path = Field(description="Path to the serialised SurnameBloomFilter file.")
     pattern_cache_path: Path = Field(description="Path to the JSON pattern cache file.")
-    bloom_hit_rate_threshold: float = Field(ge=0.0, le=1.0, description="Minimum Bloom filter hit rate to prefer cached regex over LLM fallback.")
+    bloom_hit_rate_threshold: float = Field(
+        ge=0.0,
+        le=1.0,
+        description="Minimum Bloom filter hit rate to prefer cached regex over LLM fallback.",
+    )
 
 
 class ResolutionSettings(BaseModel):
-    fuzzy_match_threshold: float = Field(ge=0.0, le=1.0, description="Minimum similarity score (0–1) to treat two PersonEntity records as the same person.")
+    fuzzy_match_threshold: float = Field(
+        ge=0.0,
+        le=1.0,
+        description="Minimum similarity score (0–1) to treat two PersonEntity records as the same person.",
+    )
     db_path: Path = Field(description="Path to the SQLite database file.")
 
 
@@ -67,7 +86,9 @@ class Settings(BaseModel):
     checkpoint_dir: Path = Field(description="Root directory for phase checkpoint files.")
     dead_letter_dir: Path = Field(description="Root directory for dead-letter failure records.")
     log_dir: Path = Field(description="Directory for pipeline log files.")
-    commoncrawl: CommonCrawlSettings = Field(description="Settings specific to Common Crawl acquisition.")
+    commoncrawl: CommonCrawlSettings = Field(
+        description="Settings specific to Common Crawl acquisition."
+    )
     ocr: OCRSettings = Field(description="Settings for the OCR phase.")
     extraction: ExtractionSettings = Field(description="Settings for the extraction phase.")
     resolution: ResolutionSettings = Field(description="Settings for the resolution phase.")

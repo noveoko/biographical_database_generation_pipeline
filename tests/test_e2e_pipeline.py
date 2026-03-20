@@ -23,27 +23,6 @@ from pathlib import Path
 
 import pytest
 
-from bio_extraction.checkpoint import CheckpointEngine
-from bio_extraction.contracts import (
-    AcquisitionResult,
-    ClassificationResult,
-    DocumentSource,
-    DocumentType,
-    ExtractionResult,
-    LayoutResult,
-    OCRResult,
-    PhaseOneInput,
-    ResolutionResult,
-    ResolvedPerson,
-)
-from bio_extraction.dead_letter import DeadLetterQueue
-from bio_extraction.exceptions import (
-    CheckpointError,
-    PhaseError,
-    PipelineError,
-)
-from bio_extraction.protocol import PhaseProtocol
-
 _NOW = datetime(2024, 3, 15, 12, 0, 0, tzinfo=timezone.utc)
 _MINIMAL_PDF = b"%PDF-1.4\n%%EOF"
 _DOC_ID = "deadbeef01234567"
@@ -162,9 +141,7 @@ class TestDeadLetterQueue:
         acquisition_result: AcquisitionResult,
     ) -> None:
         exc = ValueError("something went wrong")
-        path = dead_letter_queue.record(
-            "phase2_classification", _DOC_ID, exc, acquisition_result
-        )
+        path = dead_letter_queue.record("phase2_classification", _DOC_ID, exc, acquisition_result)
         assert path.exists()
 
     def test_record_contents(
@@ -184,11 +161,13 @@ class TestDeadLetterQueue:
         assert data[phase_key] == "phase2_classification"
         assert data["doc_id"] == _DOC_ID
         # error text is in traceback (and optionally error_message)
-        searchable = " ".join([
-            data.get("traceback") or "",
-            data.get("error_message") or "",
-            data.get("error") or "",
-        ])
+        searchable = " ".join(
+            [
+                data.get("traceback") or "",
+                data.get("error_message") or "",
+                data.get("error") or "",
+            ]
+        )
         assert "kaboom" in searchable
         assert "traceback" in data
 
@@ -218,9 +197,7 @@ class TestDeadLetterQueue:
 
 
 class TestContracts:
-    def test_acquisition_result_json_roundtrip(
-        self, acquisition_result: AcquisitionResult
-    ) -> None:
+    def test_acquisition_result_json_roundtrip(self, acquisition_result: AcquisitionResult) -> None:
         json_str = acquisition_result.model_dump_json()
         restored = AcquisitionResult.model_validate_json(json_str)
         assert restored.doc_id == acquisition_result.doc_id
@@ -228,12 +205,11 @@ class TestContracts:
         assert "pdf_bytes" in json_str  # field present in JSON
         # base64 should not contain raw binary escape sequences
         import json as _json
+
         raw = _json.loads(json_str)
         assert isinstance(raw["pdf_bytes"], str)
 
-    def test_content_slice_image_bytes_roundtrip(
-        self, layout_result: LayoutResult
-    ) -> None:
+    def test_content_slice_image_bytes_roundtrip(self, layout_result: LayoutResult) -> None:
         """image_bytes=None should round-trip cleanly."""
         json_str = layout_result.model_dump_json()
         restored = LayoutResult.model_validate_json(json_str)
@@ -255,9 +231,7 @@ class TestPhaseProtocol:
         from bio_extraction.phases.phase1_acquisition import Phase1Acquisition
 
         phase = Phase1Acquisition()
-        seed = PhaseOneInput(
-            source=DocumentSource.LOCAL, local_path=Path("/tmp/fake.pdf")
-        )
+        seed = PhaseOneInput(source=DocumentSource.LOCAL, local_path=Path("/tmp/fake.pdf"))
         with pytest.raises(NotImplementedError):
             phase.run(seed)
 

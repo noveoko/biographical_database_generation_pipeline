@@ -111,9 +111,7 @@ class DeadLetterQueue:
             path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
         except OSError as exc:
             # Failing to write the dead-letter record should never crash the runner.
-            logger.error(
-                f"Could not write dead-letter record for {phase_name}/{doc_id}: {exc}"
-            )
+            logger.error(f"Could not write dead-letter record for {phase_name}/{doc_id}: {exc}")
 
         logger.error(
             f"Dead-letter: {type(error).__name__} in {phase_name} for doc={doc_id}",

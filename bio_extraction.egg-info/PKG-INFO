@@ -8,8 +8,15 @@ Requires-Dist: pyyaml>=6.0
 Requires-Dist: pytesseract>=0.3.10
 Requires-Dist: Pillow>=10.0
 Requires-Dist: requests>=2.31
+Requires-Dist: pymupdf>=1.27.2.2
+Requires-Dist: mmh3>=5.2.1
+Requires-Dist: warcio>=1.7.5
+Requires-Dist: bitarray>=3.8.0
+Requires-Dist: numpy>=2.4.3
 Provides-Extra: dev
 Requires-Dist: pytest>=7.4; extra == "dev"
 Requires-Dist: pytest-cov>=4.1; extra == "dev"
-Requires-Dist: ruff>=0.1; extra == "dev"
+Requires-Dist: ruff>=0.4; extra == "dev"
 Requires-Dist: mypy>=1.5; extra == "dev"
+Requires-Dist: pre-commit>=3.7; extra == "dev"
+Requires-Dist: types-PyYAML>=6.0; extra == "dev"

@@ -4,14 +4,18 @@ from __future__ import annotations
 
 import json
 import sqlite3
-import unicodedata
 from datetime import datetime
 from typing import List, Optional, Tuple
 
 import Levenshtein
 
 from bio_extraction.config import get_settings
-from bio_extraction.contracts import ExtractionResult, ResolutionResult, ResolvedPerson, PersonEntity
+from bio_extraction.contracts import (
+    ExtractionResult,
+    ResolutionResult,
+    ResolvedPerson,
+    PersonEntity,
+)
 from bio_extraction.exceptions import ResolutionError
 from bio_extraction.logging_config import get_phase_logger
 from bio_extraction.protocol import PhaseProtocol

@@ -19,9 +19,8 @@ from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import Any
-from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator, model_serializer
+from pydantic import BaseModel, Field, field_validator
 
 
 # ---------------------------------------------------------------------------
@@ -109,7 +108,9 @@ class PhaseOneInput(BaseModel):
     ``cc_warc_record`` must be populated, matching ``source``.
     """
 
-    source: DocumentSource = Field(description="Whether the document comes from local disk or Common Crawl.")
+    source: DocumentSource = Field(
+        description="Whether the document comes from local disk or Common Crawl."
+    )
     local_path: Path | None = Field(
         default=None,
         description="Absolute or relative path to the PDF file on local disk. Populated when source=LOCAL.",
@@ -130,9 +131,15 @@ class AcquisitionResult(BaseModel):
 
     model_config = {"arbitrary_types_allowed": True}
 
-    doc_id: str = Field(description="Pipeline primary key — SHA-256 hex digest of the raw PDF bytes.")
-    pdf_bytes: bytes = Field(description="Raw PDF bytes. Serialised as a base64 string in JSON checkpoints.")
-    source: DocumentSource = Field(description="Origin of this document (local disk or Common Crawl).")
+    doc_id: str = Field(
+        description="Pipeline primary key — SHA-256 hex digest of the raw PDF bytes."
+    )
+    pdf_bytes: bytes = Field(
+        description="Raw PDF bytes. Serialised as a base64 string in JSON checkpoints."
+    )
+    source: DocumentSource = Field(
+        description="Origin of this document (local disk or Common Crawl)."
+    )
     source_url: str | None = Field(
         default=None,
         description="Original URL of the document. None for local-mode documents.",
@@ -147,7 +154,9 @@ class AcquisitionResult(BaseModel):
         description="Probability estimate (0–1) that the document is written in Polish.",
     )
     filename: str = Field(description="Original filename or a slug derived from the CC URL.")
-    acquired_at: datetime = Field(description="UTC timestamp when Phase 1 completed for this document.")
+    acquired_at: datetime = Field(
+        description="UTC timestamp when Phase 1 completed for this document."
+    )
 
     @field_validator("pdf_bytes", mode="before")
     @classmethod
@@ -188,7 +197,9 @@ class ClassificationResult(BaseModel):
     sample_page_indices: list[int] = Field(
         description="Indices (0-based) of the pages that were sampled to determine document type.",
     )
-    classified_at: datetime = Field(description="UTC timestamp when Phase 2 completed for this document.")
+    classified_at: datetime = Field(
+        description="UTC timestamp when Phase 2 completed for this document."
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -245,7 +256,9 @@ class LayoutResult(BaseModel):
     slices: list[ContentSlice] = Field(
         description="Ordered list of content slices detected across all pages.",
     )
-    analyzed_at: datetime = Field(description="UTC timestamp when Phase 3 completed for this document.")
+    analyzed_at: datetime = Field(
+        description="UTC timestamp when Phase 3 completed for this document."
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -278,7 +291,9 @@ class OCRResult(BaseModel):
     ocr_entries: list[OCREntry] = Field(
         description="One OCREntry per ContentSlice, in the same order as LayoutResult.slices.",
     )
-    processed_at: datetime = Field(description="UTC timestamp when Phase 4 completed for this document.")
+    processed_at: datetime = Field(
+        description="UTC timestamp when Phase 4 completed for this document."
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -301,7 +316,9 @@ class PersonEntity(BaseModel):
         description="Matches OCREntry.slice_id — provenance link back to the source text region.",
     )
     surname: str = Field(description="Primary surname (normalised to NFC Unicode, title-cased).")
-    given_names: list[str] = Field(description="List of given names in the order they appear in the source.")
+    given_names: list[str] = Field(
+        description="List of given names in the order they appear in the source."
+    )
     birth_date: str | None = Field(
         default=None,
         description="Birth date as ISO-8601 string or partial year string (e.g. '1892'). None if unknown.",
@@ -336,7 +353,9 @@ class ExtractionResult(BaseModel):
     entities: list[PersonEntity] = Field(
         description="All biographical entities extracted from this document.",
     )
-    extracted_at: datetime = Field(description="UTC timestamp when Phase 5 completed for this document.")
+    extracted_at: datetime = Field(
+        description="UTC timestamp when Phase 5 completed for this document."
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -378,4 +397,6 @@ class ResolutionResult(BaseModel):
     resolved_persons: list[ResolvedPerson] = Field(
         description="One ResolvedPerson per input PersonEntity.",
     )
-    resolved_at: datetime = Field(description="UTC timestamp when Phase 6 completed for this document.")
+    resolved_at: datetime = Field(
+        description="UTC timestamp when Phase 6 completed for this document."
+    )

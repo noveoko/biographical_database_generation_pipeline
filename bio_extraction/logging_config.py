@@ -56,10 +56,7 @@ class _JsonLinesFormatter(logging.Formatter):
 # ---------------------------------------------------------------------------
 
 
-_STDERR_FORMAT = (
-    "%(asctime)s  %(levelname)-8s  "
-    "[%(phase_name)s]  doc=%(doc_id)s  %(message)s"
-)
+_STDERR_FORMAT = "%(asctime)s  %(levelname)-8s  " "[%(phase_name)s]  doc=%(doc_id)s  %(message)s"
 
 _STDERR_DEFAULTS = {"phase_name": "-", "doc_id": "-"}
 
@@ -148,14 +145,13 @@ def get_phase_logger(phase_name: str) -> logging.Logger:
 
     # Attach an adapter that injects phase_name automatically
     class _PhaseAdapter(logging.LoggerAdapter):
-        def process(
-            self, msg: str, kwargs: dict[str, Any]
-        ) -> tuple[str, dict[str, Any]]:
+        def process(self, msg: str, kwargs: dict[str, Any]) -> tuple[str, dict[str, Any]]:
             extra = kwargs.setdefault("extra", {})
             extra.setdefault("phase_name", phase_name)
             return msg, kwargs
 
     return _PhaseAdapter(logger, {"phase_name": phase_name})  # type: ignore[return-value]
+
 
 # Alias for backward compatibility and runner.py import
 configure_logging = setup_logging

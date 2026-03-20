@@ -13,7 +13,6 @@ from pathlib import Path
 import pytest
 
 from bio_extraction.checkpoint import CheckpointEngine
-from bio_extraction.config import Settings, get_settings
 from bio_extraction.contracts import (
     AcquisitionResult,
     ClassificationResult,
@@ -182,6 +181,7 @@ def tmp_dirs(tmp_path: Path) -> dict:
 @pytest.fixture()
 def person_entity() -> "PersonEntity":
     from bio_extraction.contracts import PersonEntity, ExtractionMethod
+
     return PersonEntity(
         entity_id="11111111-1111-1111-1111-111111111111",
         slice_id="deadbeef01234567_p0_e0",
