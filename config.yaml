@@ -1,0 +1,28 @@
+source: local
+input_dir: ./input_pdfs
+checkpoint_dir: ./checkpoints
+dead_letter_dir: ./dead_letter
+log_dir: ./logs
+
+commoncrawl:
+  index_url: https://index.commoncrawl.org/CC-MAIN-2024-10-index
+  query_domains:
+    - "genealodzy.pl"
+    - "szukajwarchiwach.gov.pl"
+    - "polona.pl"
+  mime_filter: "application/pdf"
+
+ocr:
+  confidence_threshold: 0.65
+  tesseract_langs: "pol+pol_frak"
+
+extraction:
+  ollama_model: "mistral:7b"
+  ollama_url: "http://localhost:11434"
+  bloom_filter_path: ./data/polish_surnames.bloom
+  pattern_cache_path: ./data/pattern_cache.json
+  bloom_hit_rate_threshold: 0.3
+
+resolution:
+  fuzzy_match_threshold: 0.85
+  db_path: ./data/bio_extraction.db
