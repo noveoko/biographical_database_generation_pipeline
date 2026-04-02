@@ -40,9 +40,12 @@ class LayoutPhase(PhaseProtocol[ClassificationResult, LayoutResult]):
             return None
 
         try:
-            acquisition: AcquisitionResult = CheckpointEngine.load(
+            _ck_engine = CheckpointEngine(self.settings.checkpoint_dir)
+            acquisition: Optional[AcquisitionResult] = _ck_engine.load(
                 "phase1_acquisition", doc.doc_id, AcquisitionResult
             )
+            if acquisition is None:
+                raise PhaseError(self.phase_name, doc.doc_id, "No acquisition checkpoint found")
         except Exception as e:
             raise PhaseError(self.phase_name, doc.doc_id, f"Checkpoint load failed: {e}") from e
 
@@ -195,3 +198,6 @@ if __name__ == "__main__":
         print("Slices:", len(result.slices) if result else 0)
     except Exception as e:
         print("Error:", e)
+
+# Public alias used by test_e2e_pipeline.py
+Phase3Layout = LayoutPhase

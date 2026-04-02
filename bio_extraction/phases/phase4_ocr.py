@@ -260,8 +260,8 @@ class OCRPhase(PhaseProtocol[LayoutResult, OCRResult]):
         """
         grey = image.convert("L")
         _arr = np.array(grey, dtype=np.uint8)
-        thresh = threshold_sauvola(arr, window_size=_SAUVOLA_WINDOW_SIZE, k=_SAUVOLA_K)
-        binary = (arr > thresh).astype(np.uint8) * 255  # white text regions = 255
+        thresh = threshold_sauvola(_arr, window_size=_SAUVOLA_WINDOW_SIZE, k=_SAUVOLA_K)
+        binary = (_arr > thresh).astype(np.uint8) * 255  # white text regions = 255
         # Invert so text is black on white (Tesseract convention)
         binary = 255 - binary
         return Image.fromarray(binary, mode="L")
@@ -509,3 +509,6 @@ if __name__ == "__main__":
 
     assert len(result.ocr_entries) == 1, "Expected exactly 1 entry (slice_b has no image)"
     print("✓ Smoke test passed.")
+
+# Public alias used by test_e2e_pipeline.py
+Phase4OCR = OCRPhase

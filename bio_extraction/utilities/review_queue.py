@@ -62,6 +62,7 @@ class ManualReviewQueue:
         )
 
         self.conn.commit()
+        assert cursor.lastrowid is not None, "enqueue INSERT returned no lastrowid"
         return cursor.lastrowid
 
     def dequeue(self, limit: int = 10) -> List[ReviewItem]:

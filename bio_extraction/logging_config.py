@@ -28,7 +28,7 @@ import logging
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, MutableMapping
 
 # ---------------------------------------------------------------------------
 # JSON lines formatter
@@ -145,7 +145,9 @@ def get_phase_logger(phase_name: str) -> logging.Logger:
 
     # Attach an adapter that injects phase_name automatically
     class _PhaseAdapter(logging.LoggerAdapter):
-        def process(self, msg: str, kwargs: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+        def process(
+            self, msg: str, kwargs: MutableMapping[str, Any]
+        ) -> tuple[str, MutableMapping[str, Any]]:
             extra = kwargs.setdefault("extra", {})
             extra.setdefault("phase_name", phase_name)
             return msg, kwargs

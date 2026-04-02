@@ -267,7 +267,7 @@ if __name__ == "__main__":
             print(f"ERROR: {msg}")
 
     # Enums matching contracts.py
-    class DocumentType(enum.Enum):
+    class _DemoDocumentType(enum.Enum):
         DIRECTORY = "directory"
         NEWSPAPER = "newspaper"
         CIVIL_RECORD = "civil_record"
@@ -348,7 +348,7 @@ if __name__ == "__main__":
 
     # Run Phase
     phase = ClassificationPhase()
-    result = phase.run(acq_data)
+    result = phase.run(acq_data)  # type: ignore[arg-type]
 
     print("\n--- Output ---")
     if result:
@@ -359,3 +359,6 @@ if __name__ == "__main__":
         print(f"Classified At: {result.classified_at.isoformat()}")
     else:
         print("Document discarded (returned None).")
+
+# Public alias used by test_e2e_pipeline.py
+Phase2Classification = ClassificationPhase

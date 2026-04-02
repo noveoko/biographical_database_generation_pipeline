@@ -53,6 +53,7 @@ class OCRSettings(BaseModel):
 
 
 class ExtractionSettings(BaseModel):
+    ollama_timeout_seconds: int = 60
     ollama_model: str = Field(
         description="Ollama model tag used for LLM-assisted extraction (e.g. 'mistral:7b')."
     )
@@ -67,6 +68,7 @@ class ExtractionSettings(BaseModel):
 
 
 class ResolutionSettings(BaseModel):
+    sqlite_path: str = "data/resolution.db"
     fuzzy_match_threshold: float = Field(
         ge=0.0,
         le=1.0,

@@ -1,0 +1,1268 @@
+================================================================================
+SECTION 1 — bio_extraction/phases/phase4_ocr.py
+  F821 / name-defined: 'arr' undefined at lines 263-264
+================================================================================
+  FILE : bio_extraction/phases/phase4_ocr.py
+  LABEL: F821 arr undefined
+  LINES: 251-275  (error @ 263)
+--------------------------------------------------------------------------------
+       501  T(x,y) = μ(x,y) · [1 + k · (σ(x,y)/R − 1)]
+       502  000502	
+       503  where μ and σ are the local mean and standard deviation inside a
+       504  ``window_size × window_size`` neighbourhood, R is the dynamic range of
+       505  the standard deviation (128 for uint8 images), and k controls
+       506  sensitivity to local contrast (_SAUVOLA_K = 0.15).
+       507  000507	
+       508  Lower k → more pixels are classified as foreground (text); higher k →
+       509  stricter threshold, useful for high-contrast prints.
+       510  """
+       511  grey = image.convert("L")
+       512  _arr = np.array(grey, dtype=np.uint8)
+       513  thresh = threshold_sauvola(arr, window_size=_SAUVOLA_WINDOW_SIZE, k=_SAUVOLA_K)
+       514  binary = (arr > thresh).astype(np.uint8) * 255  # white text regions = 255
+       515  # Invert so text is black on white (Tesseract convention)
+       516  binary = 255 - binary
+       517  return Image.fromarray(binary, mode="L")
+       518  000518	
+       519  def _deskew(self, image: Image.Image) -> Image.Image:
+       520  """
+       521  Correct small rotational skew by sweeping ±``_DESKEW_RANGE_DEG``° in
+       522  ``_DESKEW_STEP_DEG``° increments and selecting the angle that maximises
+       523  the **variance of the horizontal projection profile**.
+       524  000524	
+       525  Intuition
+
+================================================================================
+SECTION 2 — bio_extraction/phases/phase3_layout.py
+  mypy: wrong CheckpointEngine.load() call signature at lines 43-44
+================================================================================
+  [imports block — first 40 lines of bio_extraction/phases/phase3_layout.py]
+--------------------------------------------------------------------------------
+000001	# REQUIRES: pymupdf, numpy, pillow
+000002	
+000003	from __future__ import annotations
+000004	
+000005	import io
+000006	from datetime import datetime
+000007	from typing import List, Optional, Tuple
+000008	
+000009	import fitz  # pymupdf
+000010	import numpy as np
+000011	from PIL import Image
+000012	
+000013	from bio_extraction.contracts import (
+000014	    ClassificationResult,
+000015	    LayoutResult,
+000016	    ContentSlice,
+000017	    AcquisitionResult,
+000018	    DocumentType,
+000019	)
+000020	from bio_extraction.protocol import PhaseProtocol
+000021	from bio_extraction.exceptions import PhaseError
+000022	from bio_extraction.logging_config import get_phase_logger
+000023	from bio_extraction.config import get_settings
+000024	from bio_extraction.checkpoint import CheckpointEngine
+000025	
+000026	
+000027	class LayoutPhase(PhaseProtocol[ClassificationResult, LayoutResult]):
+000028	    """Phase 3: Layout Analysis — splits directory PDFs into entry slices."""
+000029	
+000030	    phase_name = "phase3_layout"
+000031	
+000032	    def __init__(self) -> None:
+000033	        self.logger = get_phase_logger(self.phase_name)
+000034	        self.settings = get_settings()
+000035	
+000036	    def run(self, doc: ClassificationResult) -> Optional[LayoutResult]:
+000037	        """Run layout analysis on a single classified document."""
+000038	        if doc.doc_type != DocumentType.DIRECTORY:
+000039	            self.logger.info(f"Skipping non-directory doc {doc.doc_id}")
+000040	            return None
+
+  FILE : bio_extraction/phases/phase3_layout.py
+  LABEL: call-arg / arg-type on CheckpointEngine.load()
+  LINES: 31-55  (error @ 43)
+--------------------------------------------------------------------------------
+        61  000061	
+        62  def __init__(self) -> None:
+        63  self.logger = get_phase_logger(self.phase_name)
+        64  self.settings = get_settings()
+        65  000065	
+        66  def run(self, doc: ClassificationResult) -> Optional[LayoutResult]:
+        67  """Run layout analysis on a single classified document."""
+        68  if doc.doc_type != DocumentType.DIRECTORY:
+        69  self.logger.info(f"Skipping non-directory doc {doc.doc_id}")
+        70  return None
+        71  000071	
+        72  try:
+        73  acquisition: AcquisitionResult = CheckpointEngine.load(
+        74  "phase1_acquisition", doc.doc_id, AcquisitionResult
+        75  )
+        76  except Exception as e:
+        77  raise PhaseError(self.phase_name, doc.doc_id, f"Checkpoint load failed: {e}") from e
+        78  000078	
+        79  try:
+        80  pdf = fitz.open(stream=acquisition.pdf_bytes, filetype="pdf")
+        81  except Exception as e:
+        82  raise PhaseError(self.phase_name, doc.doc_id, f"Failed to open PDF: {e}") from e
+        83  000083	
+        84  slices: List[ContentSlice] = []
+        85  000085	
+
+================================================================================
+SECTION 3 — bio_extraction/phases/phase6_resolution.py
+  attr-defined: ResolutionSettings.sqlite_path (line 39)
+  assignment / return-value errors (lines 175, 204, 219)
+================================================================================
+  [imports block — first 40 lines of bio_extraction/phases/phase6_resolution.py]
+--------------------------------------------------------------------------------
+000001	# REQUIRES: python-Levenshtein
+000002	
+000003	from __future__ import annotations
+000004	
+000005	import json
+000006	import sqlite3
+000007	from datetime import datetime
+000008	from typing import List, Optional, Tuple
+000009	
+000010	import Levenshtein
+000011	
+000012	from bio_extraction.config import get_settings
+000013	from bio_extraction.contracts import (
+000014	    ExtractionResult,
+000015	    ResolutionResult,
+000016	    ResolvedPerson,
+000017	    PersonEntity,
+000018	)
+000019	from bio_extraction.exceptions import ResolutionError
+000020	from bio_extraction.logging_config import get_phase_logger
+000021	from bio_extraction.protocol import PhaseProtocol
+000022	
+000023	
+000024	class ResolutionPhase(PhaseProtocol[ExtractionResult, ResolutionResult]):
+000025	    """Phase 6 — Entity Resolution & Storage."""
+000026	
+000027	    @property
+000028	    def phase_name(self) -> str:
+000029	        return "phase6_resolution"
+000030	
+000031	    def __init__(self) -> None:
+000032	        self.logger = get_phase_logger(self.phase_name)
+000033	        self.config = get_settings()
+000034	        self.conn = self._init_db()
+000035	
+000036	    def _init_db(self) -> sqlite3.Connection:
+000037	        """Initialize SQLite database and schema."""
+000038	        try:
+000039	            conn = sqlite3.connect(self.config.resolution.sqlite_path)
+000040	            cursor = conn.cursor()
+
+  FILE : bio_extraction/phases/phase6_resolution.py
+  LABEL: attr-defined: sqlite_path
+  LINES: 27-51  (error @ 39)
+--------------------------------------------------------------------------------
+        53  @property
+        54  def phase_name(self) -> str:
+        55  return "phase6_resolution"
+        56  000056	
+        57  def __init__(self) -> None:
+        58  self.logger = get_phase_logger(self.phase_name)
+        59  self.config = get_settings()
+        60  self.conn = self._init_db()
+        61  000061	
+        62  def _init_db(self) -> sqlite3.Connection:
+        63  """Initialize SQLite database and schema."""
+        64  try:
+        65  conn = sqlite3.connect(self.config.resolution.sqlite_path)
+        66  cursor = conn.cursor()
+        67  000067	
+        68  cursor.executescript(
+        69  """
+        70  CREATE TABLE IF NOT EXISTS persons (
+        71  id INTEGER PRIMARY KEY AUTOINCREMENT,
+        72  surname TEXT NOT NULL,
+        73  given_names TEXT NOT NULL,
+        74  surname_normalized TEXT NOT NULL,
+        75  created_at TEXT NOT NULL,
+        76  updated_at TEXT NOT NULL
+        77  );
+
+  FILE : bio_extraction/phases/phase6_resolution.py
+  LABEL: assignment: None -> int
+  LINES: 163-187  (error @ 175)
+--------------------------------------------------------------------------------
+       325  rows = cursor.fetchall()
+       326  000326	
+       327  if rows:
+       328  best_id = self._pick_best_given_name_match(rows, entity.given_names)
+       329  self._update_timestamp(best_id)
+       330  return best_id, False, 1.0
+       331  000331	
+       332  # fuzzy match
+       333  cursor.execute("SELECT id, surname_normalized, given_names FROM persons")
+       334  candidates = cursor.fetchall()
+       335  000335	
+       336  best_score = 0.0
+       337  best_id = None
+       338  000338	
+       339  for pid, s_norm, g_names_json in candidates:
+       340  score = Levenshtein.ratio(norm_surname, s_norm)
+       341  if score >= self.config.resolution.fuzzy_match_threshold:
+       342  if score > best_score:
+       343  best_score = score
+       344  best_id = pid
+       345  000345	
+       346  if best_id:
+       347  self._update_timestamp(best_id)
+       348  return best_id, False, best_score
+       349  000349	
+
+  FILE : bio_extraction/phases/phase6_resolution.py
+  LABEL: return-value: tuple mismatch
+  LINES: 192-216  (error @ 204)
+--------------------------------------------------------------------------------
+       383  INSERT INTO persons (surname, given_names, surname_normalized, created_at, updated_at)
+       384  VALUES (?, ?, ?, ?, ?)
+       385  """,
+       386  (
+       387  entity.surname,
+       388  json.dumps(entity.given_names),
+       389  norm_surname,
+       390  now,
+       391  now,
+       392  ),
+       393  )
+       394  self.conn.commit()
+       395  return cursor.lastrowid, True, None
+       396  000396	
+       397  def _pick_best_given_name_match(self, rows, given_names: List[str]) -> int:
+       398  """Pick best candidate based on Jaccard similarity."""
+       399  target = set(given_names)
+       400  best_score = -1
+       401  best_id = rows[0][0]
+       402  000402	
+       403  for pid, g_names_json in rows:
+       404  existing = set(json.loads(g_names_json))
+       405  union = len(target | existing)
+       406  inter = len(target & existing)
+       407  score = inter / union if union else 0
+
+  FILE : bio_extraction/phases/phase6_resolution.py
+  LABEL: assignment: float -> int
+  LINES: 207-231  (error @ 219)
+--------------------------------------------------------------------------------
+       413  """Pick best candidate based on Jaccard similarity."""
+       414  target = set(given_names)
+       415  best_score = -1
+       416  best_id = rows[0][0]
+       417  000417	
+       418  for pid, g_names_json in rows:
+       419  existing = set(json.loads(g_names_json))
+       420  union = len(target | existing)
+       421  inter = len(target & existing)
+       422  score = inter / union if union else 0
+       423  000423	
+       424  if score > best_score:
+       425  best_score = score
+       426  best_id = pid
+       427  000427	
+       428  return best_id
+       429  000429	
+       430  def _update_timestamp(self, person_id: int) -> None:
+       431  """Update updated_at timestamp."""
+       432  self.conn.execute(
+       433  "UPDATE persons SET updated_at = ? WHERE id = ?",
+       434  (datetime.utcnow().isoformat(), person_id),
+       435  )
+       436  self.conn.commit()
+       437  000437	
+
+================================================================================
+SECTION 4 — bio_extraction/phases/phase2_classification.py
+  no-redef: DocumentType re-defined at line 270
+  arg-type: MockAcquisitionResult passed where AcquisitionResult expected (line 351)
+================================================================================
+  [imports block — first 40 lines of bio_extraction/phases/phase2_classification.py]
+--------------------------------------------------------------------------------
+000001	# REQUIRES: pymupdf
+000002	import re
+000003	from datetime import datetime, timezone
+000004	from typing import List, Tuple, Dict, Any
+000005	
+000006	import fitz  # PyMuPDF
+000007	
+000008	from bio_extraction.contracts import AcquisitionResult, ClassificationResult, DocumentType
+000009	from bio_extraction.protocol import PhaseProtocol
+000010	from bio_extraction.exceptions import PhaseError
+000011	from bio_extraction.logging_config import get_phase_logger
+000012	from bio_extraction.config import get_settings
+000013	
+000014	
+000015	class ClassificationPhase(PhaseProtocol[AcquisitionResult, ClassificationResult]):
+000016	    """
+000017	    Phase 2: Document Classification.
+000018	
+000019	    Classifies an acquired PDF into DIRECTORY, NEWSPAPER, CIVIL_RECORD, or UNKNOWN
+000020	    using rule-based structural and textual heuristics on sampled pages.
+000021	    """
+000022	
+000023	    def __init__(self) -> None:
+000024	        self._phase_name = "phase2_classification"
+000025	        self.logger = get_phase_logger(self.phase_name)
+000026	        self.settings = get_settings()
+000027	
+000028	        # Pre-compile regexes for textual density analysis
+000029	        # SURNAME, Name (e.g., KOWALSKI, Jan)
+000030	        self.re_surname_name = re.compile(
+000031	            r"\b[A-ZĄĆĘŁŃÓŚŹŻ]{2,},\s+[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+\b"
+000032	        )
+000033	        # Dates (e.g., ur. 1890, zm. 1945, *1890, †1945)
+000034	        self.re_dates = re.compile(r"(?:ur\.|zm\.|[*†])\s*\d{4}")
+000035	        # Address fragments (e.g., ul., pl., al.)
+000036	        self.re_addresses = re.compile(r"\b(?:ul\.|pl\.|al\.)\b", re.IGNORECASE)
+000037	        # Section keywords for civil records
+000038	        self.re_keywords = re.compile(
+000039	            r"\b(?:SPIS|KSIĘGA|REJESTR|ZGONÓW|URODZEŃ|MAŁŻEŃSTW)\b", re.IGNORECASE
+000040	        )
+
+  FILE : bio_extraction/phases/phase2_classification.py
+  LABEL: no-redef: DocumentType
+  LINES: 258-282  (error @ 270)
+--------------------------------------------------------------------------------
+       515  print(f"INFO: {msg}")
+       516  000516	
+       517  def warning(self, msg):
+       518  print(f"WARN: {msg}")
+       519  000519	
+       520  def debug(self, msg):
+       521  print(f"DEBUG: {msg}")
+       522  000522	
+       523  def error(self, msg):
+       524  print(f"ERROR: {msg}")
+       525  000525	
+       526  # Enums matching contracts.py
+       527  class DocumentType(enum.Enum):
+       528  DIRECTORY = "directory"
+       529  NEWSPAPER = "newspaper"
+       530  CIVIL_RECORD = "civil_record"
+       531  UNKNOWN = "unknown"
+       532  000532	
+       533  @dataclass
+       534  class MockAcquisitionResult:
+       535  doc_id: str
+       536  pdf_bytes: bytes
+       537  000537	
+       538  @dataclass
+       539  class MockClassificationResult:
+
+  FILE : bio_extraction/phases/phase2_classification.py
+  LABEL: arg-type: MockAcquisitionResult
+  LINES: 339-361  (error @ 351)
+--------------------------------------------------------------------------------
+       677  page.insert_text((50, 50), "KOWALSKI, Jan ur. 1890 ul. Warszawska 1")
+       678  page.insert_text((50, 70), "NOWAK, Piotr zm. 1945 pl. Wolności 2")
+       679  page.insert_text((50, 90), "WIŚNIEWSKI, Adam *1900 al. Jerozolimskie")
+       680  # Draw a line down the middle to simulate 2 columns
+       681  page.draw_line(fitz.Point(300, 0), fitz.Point(300, 800))
+       682  pdf_bytes = test_doc.write()
+       683  test_doc.close()
+       684  000684	
+       685  acq_data = MockAcquisitionResult(doc_id="doc_123_test", pdf_bytes=pdf_bytes)
+       686  000686	
+       687  # Run Phase
+       688  phase = ClassificationPhase()
+       689  result = phase.run(acq_data)
+       690  000690	
+       691  print("\n--- Output ---")
+       692  if result:
+       693  print(f"Success! Document ID: {result.doc_id}")
+       694  print(f"Type: {result.doc_type.value}")
+       695  print(f"Confidence: {result.confidence}")
+       696  print(f"Sampled Pages: {result.sample_page_indices}")
+       697  print(f"Classified At: {result.classified_at.isoformat()}")
+       698  else:
+       699  print("Document discarded (returned None).")
+
+================================================================================
+SECTION 5 — bio_extraction/phases/phase5_extraction.py
+  call-arg: PatternCache() missing 'cache_path' (line 184)
+  attr-defined: PatternCache.set missing (line 605)
+  attr-defined: ExtractionSettings.ollama_timeout_seconds missing (lines 657, 675)
+================================================================================
+  [imports block — first 40 lines of bio_extraction/phases/phase5_extraction.py]
+--------------------------------------------------------------------------------
+000001	# REQUIRES: requests
+000002	
+000003	"""
+000004	phase5_extraction.py
+000005	====================
+000006	Phase 5 — Hybrid Entity Extraction.
+000007	
+000008	Extracts structured ``PersonEntity`` objects from OCR text using a two-tier
+000009	strategy:
+000010	
+000011	  Tier 1 — Cached regex   (fast, O(1) once the cache is warm)
+000012	  Tier 2 — Ollama LLM     (fallback for unseen structural layouts)
+000013	
+000014	After a successful LLM extraction the phase attempts to synthesise a candidate
+000015	regex for the detected structural fingerprint, validates it against the current
+000016	batch and the SurnameBloomFilter, and — if it passes — stores it in the
+000017	PatternCache so that future documents with the same layout skip the LLM entirely.
+000018	
+000019	Dependency contracts
+000020	--------------------
+000021	- Reads from : ``OCRResult``  (one ``OCREntry`` per content slice)
+000022	- Writes to  : ``ExtractionResult``  (one or many ``PersonEntity`` per document)
+000023	- Utilities  : ``bio_extraction.utilities.pattern_cache.PatternCache``
+000024	               ``bio_extraction.utilities.bloom_filter.SurnameBloomFilter``
+000025	- Config     : ``bio_extraction.config.get_settings()``
+000026	- Logger     : ``bio_extraction.logging_config.get_phase_logger(self.phase_name)``
+000027	"""
+000028	
+000029	from __future__ import annotations
+000030	
+000031	import hashlib
+000032	import json
+000033	import re
+000034	import uuid
+000035	from collections import defaultdict
+000036	from typing import Any
+000037	
+000038	import requests
+000039	
+000040	from bio_extraction.config import get_settings
+
+  FILE : bio_extraction/phases/phase5_extraction.py
+  LABEL: call-arg: PatternCache missing cache_path
+  LINES: 172-196  (error @ 184)
+--------------------------------------------------------------------------------
+       343  testability.
+       344  """
+       345  000345	
+       346  def __init__(
+       347  self,
+       348  pattern_cache: PatternCache | None = None,
+       349  bloom_filter: SurnameBloomFilter | None = None,
+       350  ) -> None:
+       351  self._log = get_phase_logger(self.phase_name)
+       352  settings = get_settings()
+       353  self._cfg = settings.extraction  # sub-config block for this phase
+       354  000354	
+       355  self._cache: PatternCache = pattern_cache or PatternCache()
+       356  self._bloom: SurnameBloomFilter = bloom_filter or SurnameBloomFilter()
+       357  000357	
+       358  # Lazily-populated map: fingerprint → [raw_text, …] for the current
+       359  # document.  Used when validating a newly generated candidate regex
+       360  # against peer entries that share the same structural layout.
+       361  self._fingerprint_peers: dict[str, list[str]] = defaultdict(list)
+       362  000362	
+       363  # ------------------------------------------------------------------
+       364  # PhaseProtocol interface
+       365  # ------------------------------------------------------------------
+       366  000366	
+       367  @property
+
+  FILE : bio_extraction/phases/phase5_extraction.py
+  LABEL: attr-defined: PatternCache.set
+  LINES: 593-617  (error @ 605)
+--------------------------------------------------------------------------------
+      1185  threshold = self._cfg.bloom_hit_rate_threshold
+      1186  if hit_rate < threshold:
+      1187  self._log.warning(
+      1188  "slice=%s fingerprint=%s — candidate regex bloom hit rate %.2f < %.2f; rejected",
+      1189  slice_id,
+      1190  fingerprint,
+      1191  hit_rate,
+      1192  threshold,
+      1193  )
+      1194  return
+      1195  001195	
+      1196  # --- Store in cache -----------------------------------------------
+      1197  self._cache.set(fingerprint, compiled)
+      1198  self._log.info(
+      1199  "slice=%s fingerprint=%s — cached new regex pattern",
+      1200  slice_id,
+      1201  fingerprint,
+      1202  )
+      1203  001203	
+      1204  # ------------------------------------------------------------------
+      1205  # Ollama HTTP helper
+      1206  # ------------------------------------------------------------------
+      1207  001207	
+      1208  def _call_ollama(
+      1209  self,
+
+  FILE : bio_extraction/phases/phase5_extraction.py
+  LABEL: attr-defined: ollama_timeout_seconds
+  LINES: 645-669  (error @ 657)
+--------------------------------------------------------------------------------
+      1289  url = f"{self._cfg.ollama_url.rstrip('/')}/api/generate"
+      1290  payload: dict[str, Any] = {
+      1291  "model": self._cfg.ollama_model,
+      1292  "prompt": prompt,
+      1293  "stream": False,
+      1294  "format": "json",
+      1295  }
+      1296  001296	
+      1297  try:
+      1298  response = requests.post(
+      1299  url,
+      1300  json=payload,
+      1301  timeout=self._cfg.ollama_timeout_seconds,
+      1302  )
+      1303  response.raise_for_status()
+      1304  except requests.exceptions.ConnectionError as exc:
+      1305  raise ExtractionError(
+      1306  phase_name=self.phase_name,
+      1307  doc_id=doc_id,
+      1308  message=(
+      1309  f"Cannot reach Ollama at {url}. "
+      1310  "Ensure Ollama is running (`ollama serve`) and "
+      1311  f"config.extraction.ollama_url is correct. Detail: {exc}"
+      1312  ),
+      1313  ) from exc
+
+  FILE : bio_extraction/phases/phase5_extraction.py
+  LABEL: attr-defined: ollama_timeout_seconds (2nd)
+  LINES: 663-687  (error @ 675)
+--------------------------------------------------------------------------------
+      1325  doc_id=doc_id,
+      1326  message=(
+      1327  f"Cannot reach Ollama at {url}. "
+      1328  "Ensure Ollama is running (`ollama serve`) and "
+      1329  f"config.extraction.ollama_url is correct. Detail: {exc}"
+      1330  ),
+      1331  ) from exc
+      1332  except requests.exceptions.Timeout as exc:
+      1333  raise ExtractionError(
+      1334  phase_name=self.phase_name,
+      1335  doc_id=doc_id,
+      1336  message=(
+      1337  f"Ollama request timed out after "
+      1338  f"{self._cfg.ollama_timeout_seconds}s (slice={slice_id}). "
+      1339  f"Detail: {exc}"
+      1340  ),
+      1341  ) from exc
+      1342  except requests.exceptions.HTTPError as exc:
+      1343  raise ExtractionError(
+      1344  phase_name=self.phase_name,
+      1345  doc_id=doc_id,
+      1346  message=f"Ollama HTTP error for slice={slice_id}: {exc}",
+      1347  ) from exc
+      1348  001348	
+      1349  try:
+
+  [Searching for PatternCache class definition]
+--------------------------------------------------------------------------------
+./bio_extraction/utilities/pattern_cache.py:13:class PatternCache:
+
+  [Searching for ExtractionSettings class definition]
+--------------------------------------------------------------------------------
+./bio_extraction/config.py:55:class ExtractionSettings(BaseModel):
+
+================================================================================
+SECTION 6 — bio_extraction/phases/phase1_acquisition.py
+  assignment: _FakeSettings vs Settings at line 813
+================================================================================
+  [imports block — first 40 lines of bio_extraction/phases/phase1_acquisition.py]
+--------------------------------------------------------------------------------
+000001	# REQUIRES: pymupdf, warcio, requests
+000002	
+000003	"""
+000004	bio_extraction/phases/phase1_acquisition.py
+000005	============================================
+000006	Phase 1 — Acquisition & Filtering
+000007	
+000008	Responsibilities
+000009	----------------
+000010	* Accept a ``PhaseOneInput`` (local PDF path **or** CommonCrawl WARC record
+000011	  pointer) and return a populated ``AcquisitionResult``, or ``None`` to
+000012	  discard the document.
+000013	* Run a lightweight Polish-language heuristic on the first 500 chars of
+000014	  extracted text; documents that score below the configured threshold are
+000015	  silently dropped (``run()`` returns ``None`` — the runner logs the discard
+000016	  and does not enqueue the document downstream).
+000017	* Expose two helper functions used by the runner to seed the Phase-1 queue:
+000018	  ``enumerate_local_inputs`` and ``enumerate_commoncrawl_inputs``.
+000019	
+000020	Design notes
+000021	------------
+000022	* All I/O is synchronous.  The runner is responsible for concurrency.
+000023	* SHA-256 is truncated to 16 hex characters as the ``doc_id`` — enough
+000024	  entropy for deduplication within a single pipeline run (~2^64 space).
+000025	* The lang-score formula is:
+000026	      lang_score = (char_density × 0.6) + (word_density × 0.4)
+000027	  Both sub-scores are individually clamped to [0, 1] before weighting,
+000028	  so the composite score is always in [0.0, 1.0].
+000029	* ``AcquisitionError`` inherits from ``PhaseError``, which requires
+000030	  ``(phase_name, doc_id, message)``.  When an error occurs before the
+000031	  ``doc_id`` has been computed (e.g. file-not-found, network failure),
+000032	  the sentinel string ``"unknown"`` is used as the ``doc_id`` argument.
+000033	* ``_extract_pdf_from_warc`` returns a ``(pdf_bytes, warc_record_id)`` tuple
+000034	  so the WARC-Record-ID header value can be stored in ``AcquisitionResult``.
+000035	"""
+000036	
+000037	from __future__ import annotations
+000038	
+000039	import hashlib
+000040	import io
+
+  FILE : bio_extraction/phases/phase1_acquisition.py
+  LABEL: assignment: _FakeSettings vs Settings
+  LINES: 801-825  (error @ 813)
+--------------------------------------------------------------------------------
+      1601  # Stub settings to fix the Mypy "Cannot infer type of lambda" error
+      1602  class _FakeSettings:
+      1603  lang_score_threshold: float = 0.30
+      1604  cc_request_timeout: int = 30
+      1605  # Add other required settings attributes here if AcquisitionPhase needs them
+      1606  input_dir: str = tmpdir
+      1607  source: str = "local"
+      1608  001608	
+      1609  import bio_extraction.config as _cfg
+      1610  001610	
+      1611  _original = _cfg.get_settings
+      1612  # Fixed lambda to accept arguments if the real get_settings does
+      1613  _cfg.get_settings = lambda *args, **kwargs: _FakeSettings()
+      1614  001614	
+      1615  try:
+      1616  phase = AcquisitionPhase()
+      1617  001617	
+      1618  # Should produce a result
+      1619  result = phase.run(PhaseOneInput(source=DocumentSource.LOCAL, local_path=polish_pdf))
+      1620  assert result is not None
+      1621  assert len(result.doc_id) == 16
+      1622  assert result.lang_score >= 0.30
+      1623  assert result.source is DocumentSource.LOCAL
+      1624  assert result.filename == "polish.pdf"
+      1625  assert isinstance(result.acquired_at, datetime)
+
+================================================================================
+SECTION 7 — bio_extraction/utilities/bloom_filter.py
+  has-type: Cannot determine type of size/hash_count/bit_array (lines 45-47)
+================================================================================
+  [imports block — first 40 lines of bio_extraction/utilities/bloom_filter.py]
+--------------------------------------------------------------------------------
+000001	# REQUIRES: mmh3, bitarray
+000002	
+000003	from __future__ import annotations
+000004	
+000005	import math
+000006	import unicodedata
+000007	from pathlib import Path
+000008	from typing import List
+000009	
+000010	import mmh3
+000011	from bitarray import bitarray
+000012	
+000013	
+000014	class SurnameBloomFilter:
+000015	    """
+000016	    Probabilistic Bloom filter for Polish surname validation.
+000017	
+000018	    Design goals:
+000019	    - False positives are acceptable (~1% target).
+000020	    - False negatives must not occur.
+000021	    - Optimized for ~200,000 surnames.
+000022	
+000023	    Default parameters:
+000024	    - m ≈ 1,917,011 bits (~234 KB)
+000025	    - k ≈ 7 hash functions
+000026	
+000027	    Normalization:
+000028	    - Lowercase
+000029	    - Strip Polish diacritics (ą→a, ć→c, etc.)
+000030	    - Trim whitespace
+000031	
+000032	    Suggested training data sources (user-provided):
+000033	    - "Słownik nazwisk współcześnie w Polsce używanych"
+000034	    - FamilySearch / GenoPro surname datasets
+000035	    - Extracted surnames from validated OCR pipeline outputs
+000036	    """
+000037	
+000038	    DEFAULT_CAPACITY = 200_000
+000039	    DEFAULT_ERROR_RATE = 0.01
+000040	
+
+  FILE : bio_extraction/utilities/bloom_filter.py
+  LABEL: has-type: size/hash_count/bit_array
+  LINES: 33-57  (error @ 45)
+--------------------------------------------------------------------------------
+        65  - "Słownik nazwisk współcześnie w Polsce używanych"
+        66  - FamilySearch / GenoPro surname datasets
+        67  - Extracted surnames from validated OCR pipeline outputs
+        68  """
+        69  000069	
+        70  DEFAULT_CAPACITY = 200_000
+        71  DEFAULT_ERROR_RATE = 0.01
+        72  000072	
+        73  def __init__(self, bloom_path: Path | None = None):
+        74  """Load from disk if provided, otherwise initialize empty filter."""
+        75  if bloom_path:
+        76  loaded = self.from_file(bloom_path)
+        77  self.size = loaded.size
+        78  self.hash_count = loaded.hash_count
+        79  self.bit_array = loaded.bit_array
+        80  else:
+        81  self.size, self.hash_count = self._optimal_params(
+        82  self.DEFAULT_CAPACITY, self.DEFAULT_ERROR_RATE
+        83  )
+        84  self.bit_array = bitarray(self.size)
+        85  self.bit_array.setall(0)
+        86  000086	
+        87  # ---------------- PUBLIC API ----------------
+        88  000088	
+        89  def train(self, surnames: List[str]) -> None:
+
+================================================================================
+SECTION 8 — bio_extraction/logging_config.py
+  override / LSP violation: LoggingAdapter.process() signature (line 148)
+================================================================================
+  [imports block — first 40 lines of bio_extraction/logging_config.py]
+--------------------------------------------------------------------------------
+000001	"""
+000002	logging_config.py
+000003	=================
+000004	Structured logging setup for the bio_extraction pipeline.
+000005	
+000006	Every log record is written in two places:
+000007	1. ``./logs/pipeline.jsonl`` — one JSON object per line for machine consumption
+000008	   / post-hoc analysis.
+000009	2. ``stderr`` — human-readable format for live monitoring.
+000010	
+000011	Both handlers include ``timestamp``, ``level``, ``phase_name``, ``doc_id``,
+000012	and ``message`` when those fields are present.
+000013	
+000014	Usage
+000015	-----
+000016	    from bio_extraction.logging_config import setup_logging, get_phase_logger
+000017	
+000018	    setup_logging(log_dir=Path("./logs"))
+000019	
+000020	    logger = get_phase_logger("phase3_layout")
+000021	    logger.info("Processing slice", extra={"doc_id": "abc123"})
+000022	"""
+000023	
+000024	from __future__ import annotations
+000025	
+000026	import json
+000027	import logging
+000028	import sys
+000029	from datetime import datetime, timezone
+000030	from pathlib import Path
+000031	from typing import Any
+000032	
+000033	# ---------------------------------------------------------------------------
+000034	# JSON lines formatter
+000035	# ---------------------------------------------------------------------------
+000036	
+000037	
+000038	class _JsonLinesFormatter(logging.Formatter):
+000039	    """Emit one JSON object per log record, terminated by a newline."""
+000040	
+
+  FILE : bio_extraction/logging_config.py
+  LABEL: override: process() signature mismatch
+  LINES: 136-157  (error @ 148)
+--------------------------------------------------------------------------------
+       271  A logger whose records always carry ``phase_name`` in their ``extra``
+       272  dict, ready for both the JSON-lines and stderr handlers.
+       273  000273	
+       274  Example
+       275  -------
+       276  logger = get_phase_logger("phase5_extraction")
+       277  logger.info("Entity found", extra={"doc_id": "abc123"})
+       278  """
+       279  logger = logging.getLogger(f"bio_extraction.{phase_name}")
+       280  000280	
+       281  # Attach an adapter that injects phase_name automatically
+       282  class _PhaseAdapter(logging.LoggerAdapter):
+       283  def process(self, msg: str, kwargs: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+       284  extra = kwargs.setdefault("extra", {})
+       285  extra.setdefault("phase_name", phase_name)
+       286  return msg, kwargs
+       287  000287	
+       288  return _PhaseAdapter(logger, {"phase_name": phase_name})  # type: ignore[return-value]
+       289  000289	
+       290  000290	
+       291  # Alias for backward compatibility and runner.py import
+       292  configure_logging = setup_logging
+
+================================================================================
+SECTION 9 — bio_extraction/utilities/review_queue.py
+  return-value: got int | None, expected int (line 65)
+================================================================================
+  FILE : bio_extraction/utilities/review_queue.py
+  LABEL: return-value: int | None
+  LINES: 53-77  (error @ 65)
+--------------------------------------------------------------------------------
+       105  (
+       106  item.doc_id,
+       107  item.slice_id,
+       108  item.phase_name,
+       109  item.reason,
+       110  json.dumps(item.data_snapshot, ensure_ascii=False),
+       111  item.created_at.isoformat(),
+       112  item.status,
+       113  ),
+       114  )
+       115  000115	
+       116  self.conn.commit()
+       117  return cursor.lastrowid
+       118  000118	
+       119  def dequeue(self, limit: int = 10) -> List[ReviewItem]:
+       120  """Fetch the next N unreviewed items (FIFO)."""
+       121  cursor = self.conn.cursor()
+       122  000122	
+       123  cursor.execute(
+       124  """
+       125  SELECT * FROM review_queue
+       126  WHERE status = 'pending'
+       127  ORDER BY created_at ASC
+       128  LIMIT ?
+       129  """,
+
+================================================================================
+SECTION 10 — tests/test_e2e_pipeline.py
+  F821 / name-defined: mass missing imports — showing top of file
+================================================================================
+  [imports block — first 40 lines of tests/test_e2e_pipeline.py]
+--------------------------------------------------------------------------------
+000001	"""
+000002	End-to-end smoke tests for the bio_extraction pipeline infrastructure.
+000003	
+000004	These tests verify that the runner, checkpoint engine, dead-letter queue,
+000005	and contract models work together correctly WITHOUT requiring any real phase
+000006	implementation.  Phase stubs are replaced with controlled test doubles.
+000007	
+000008	Test doubles strategy
+000009	---------------------
+000010	Each test creates lightweight ``FakePhaseN`` classes that:
+000011	  - Inherit ``PhaseProtocol``
+000012	  - Return a hard-coded contract model on ``run()``
+000013	  - Optionally raise an exception to test dead-letter routing
+000014	
+000015	This ensures infra tests are hermetic and fast (no disk I/O beyond tmp dirs,
+000016	no network, no OCR or LLM calls).
+000017	"""
+000018	
+000019	from __future__ import annotations
+000020	
+000021	from datetime import datetime, timezone
+000022	from pathlib import Path
+000023	
+000024	import pytest
+000025	
+000026	_NOW = datetime(2024, 3, 15, 12, 0, 0, tzinfo=timezone.utc)
+000027	_MINIMAL_PDF = b"%PDF-1.4\n%%EOF"
+000028	_DOC_ID = "deadbeef01234567"
+000029	
+000030	
+000031	# ---------------------------------------------------------------------------
+000032	# Exception hierarchy tests
+000033	# ---------------------------------------------------------------------------
+000034	
+000035	
+000036	class TestExceptions:
+000037	    def test_phase_error_is_pipeline_error(self) -> None:
+000038	        err = PhaseError("phase1_acquisition", "abc123", "boom")
+000039	        assert isinstance(err, PipelineError)
+000040	        assert "phase1_acquisition" in str(err)
+
+  FILE : tests/test_e2e_pipeline.py
+  LABEL: missing names block
+  LINES: 23-47  (error @ 35)
+--------------------------------------------------------------------------------
+        45  000045	
+        46  import pytest
+        47  000047	
+        48  _NOW = datetime(2024, 3, 15, 12, 0, 0, tzinfo=timezone.utc)
+        49  _MINIMAL_PDF = b"%PDF-1.4\n%%EOF"
+        50  _DOC_ID = "deadbeef01234567"
+        51  000051	
+        52  000052	
+        53  # ---------------------------------------------------------------------------
+        54  # Exception hierarchy tests
+        55  # ---------------------------------------------------------------------------
+        56  000056	
+        57  000057	
+        58  class TestExceptions:
+        59  def test_phase_error_is_pipeline_error(self) -> None:
+        60  err = PhaseError("phase1_acquisition", "abc123", "boom")
+        61  assert isinstance(err, PipelineError)
+        62  assert "phase1_acquisition" in str(err)
+        63  assert "abc123" in str(err)
+        64  000064	
+        65  def test_checkpoint_error_is_pipeline_error(self) -> None:
+        66  assert issubclass(CheckpointError, PipelineError)
+        67  000067	
+        68  000068	
+        69  # ---------------------------------------------------------------------------
+
+  FILE : tests/test_e2e_pipeline.py
+  LABEL: missing names block
+  LINES: 41-65  (error @ 53)
+--------------------------------------------------------------------------------
+        81  assert "abc123" in str(err)
+        82  000082	
+        83  def test_checkpoint_error_is_pipeline_error(self) -> None:
+        84  assert issubclass(CheckpointError, PipelineError)
+        85  000085	
+        86  000086	
+        87  # ---------------------------------------------------------------------------
+        88  # CheckpointEngine tests
+        89  # ---------------------------------------------------------------------------
+        90  000090	
+        91  000091	
+        92  class TestCheckpointEngine:
+        93  def test_save_and_load_roundtrip(
+        94  self,
+        95  checkpoint_engine: CheckpointEngine,
+        96  acquisition_result: AcquisitionResult,
+        97  ) -> None:
+        98  doc_id = acquisition_result.doc_id
+        99  checkpoint_engine.save("phase1_acquisition", doc_id, acquisition_result)
+       100  loaded = checkpoint_engine.load("phase1_acquisition", doc_id, AcquisitionResult)
+       101  assert loaded is not None
+       102  assert loaded.doc_id == doc_id
+       103  assert loaded.lang_score == pytest.approx(0.95)
+       104  000104	
+       105  def test_bytes_roundtrip_via_base64(
+
+  FILE : tests/test_e2e_pipeline.py
+  LABEL: missing names block
+  LINES: 96-120  (error @ 108)
+--------------------------------------------------------------------------------
+       191  def test_load_nonexistent_returns_none(self, checkpoint_engine: CheckpointEngine) -> None:
+       192  result = checkpoint_engine.load("phase1_acquisition", "ghost", AcquisitionResult)
+       193  assert result is None
+       194  000194	
+       195  def test_clear_single_phase(
+       196  self,
+       197  checkpoint_engine: CheckpointEngine,
+       198  acquisition_result: AcquisitionResult,
+       199  ) -> None:
+       200  checkpoint_engine.save("phase1_acquisition", _DOC_ID, acquisition_result)
+       201  checkpoint_engine.clear("phase1_acquisition")
+       202  assert not checkpoint_engine.exists("phase1_acquisition", _DOC_ID)
+       203  000203	
+       204  def test_clear_all(
+       205  self,
+       206  checkpoint_engine: CheckpointEngine,
+       207  acquisition_result: AcquisitionResult,
+       208  classification_result: ClassificationResult,
+       209  ) -> None:
+       210  checkpoint_engine.save("phase1_acquisition", _DOC_ID, acquisition_result)
+       211  checkpoint_engine.save("phase2_classification", _DOC_ID, classification_result)
+       212  checkpoint_engine.clear()
+       213  assert checkpoint_engine.list_completed("phase1_acquisition") == set()
+       214  assert checkpoint_engine.list_completed("phase2_classification") == set()
+       215  000215	
+
+  FILE : tests/test_e2e_pipeline.py
+  LABEL: missing names block
+  LINES: 126-150  (error @ 138)
+--------------------------------------------------------------------------------
+       251  ) -> None:
+       252  checkpoint_engine.save("phase1_acquisition", _DOC_ID, acquisition_result)
+       253  tmp_files = list((tmp_dirs["checkpoints"] / "phase1_acquisition").glob("*.tmp"))
+       254  assert tmp_files == []
+       255  000255	
+       256  000256	
+       257  # ---------------------------------------------------------------------------
+       258  # DeadLetterQueue tests
+       259  # ---------------------------------------------------------------------------
+       260  000260	
+       261  000261	
+       262  class TestDeadLetterQueue:
+       263  def test_record_creates_file(
+       264  self,
+       265  dead_letter_queue: DeadLetterQueue,
+       266  acquisition_result: AcquisitionResult,
+       267  ) -> None:
+       268  exc = ValueError("something went wrong")
+       269  path = dead_letter_queue.record("phase2_classification", _DOC_ID, exc, acquisition_result)
+       270  assert path.exists()
+       271  000271	
+       272  def test_record_contents(
+       273  self,
+       274  dead_letter_queue: DeadLetterQueue,
+       275  acquisition_result: AcquisitionResult,
+
+  FILE : tests/test_e2e_pipeline.py
+  LABEL: missing names block
+  LINES: 161-185  (error @ 173)
+--------------------------------------------------------------------------------
+       321  assert data[phase_key] == "phase2_classification"
+       322  assert data["doc_id"] == _DOC_ID
+       323  # error text is in traceback (and optionally error_message)
+       324  searchable = " ".join(
+       325  [
+       326  data.get("traceback") or "",
+       327  data.get("error_message") or "",
+       328  data.get("error") or "",
+       329  ]
+       330  )
+       331  assert "kaboom" in searchable
+       332  assert "traceback" in data
+       333  000333	
+       334  def test_list_failures_all(
+       335  self,
+       336  dead_letter_queue: DeadLetterQueue,
+       337  ) -> None:
+       338  dead_letter_queue.record("phase1_acquisition", "doc1", ValueError("e1"), None)
+       339  dead_letter_queue.record("phase2_classification", "doc2", ValueError("e2"), None)
+       340  failures = dead_letter_queue.list_failures()
+       341  assert len(failures) == 2
+       342  000342	
+       343  def test_list_failures_filtered(
+       344  self,
+       345  dead_letter_queue: DeadLetterQueue,
+
+  FILE : tests/test_e2e_pipeline.py
+  LABEL: missing names block
+  LINES: 185-209  (error @ 197)
+--------------------------------------------------------------------------------
+       369  dead_letter_queue: DeadLetterQueue,
+       370  ) -> None:
+       371  dead_letter_queue.record("phase1_acquisition", "doc1", ValueError("e1"), None)
+       372  dead_letter_queue.record("phase2_classification", "doc2", ValueError("e2"), None)
+       373  failures = dead_letter_queue.list_failures("phase1_acquisition")
+       374  assert len(failures) == 1
+       375  assert failures[0]["doc_id"] == "doc1"
+       376  000376	
+       377  000377	
+       378  # ---------------------------------------------------------------------------
+       379  # Contract model tests
+       380  # ---------------------------------------------------------------------------
+       381  000381	
+       382  000382	
+       383  class TestContracts:
+       384  def test_acquisition_result_json_roundtrip(self, acquisition_result: AcquisitionResult) -> None:
+       385  json_str = acquisition_result.model_dump_json()
+       386  restored = AcquisitionResult.model_validate_json(json_str)
+       387  assert restored.doc_id == acquisition_result.doc_id
+       388  assert restored.pdf_bytes == acquisition_result.pdf_bytes
+       389  assert "pdf_bytes" in json_str  # field present in JSON
+       390  # base64 should not contain raw binary escape sequences
+       391  import json as _json
+       392  000392	
+       393  raw = _json.loads(json_str)
+
+  FILE : tests/test_e2e_pipeline.py
+  LABEL: missing names block
+  LINES: 216-240  (error @ 228)
+--------------------------------------------------------------------------------
+       431  assert restored.slices[0].image_bytes is None
+       432  000432	
+       433  def test_person_entity_fields(self, person_entity) -> None:
+       434  assert person_entity.surname == "Kowalski"
+       435  assert "Jan" in person_entity.given_names
+       436  assert person_entity.birth_date == "1889"
+       437  000437	
+       438  000438	
+       439  # ---------------------------------------------------------------------------
+       440  # Protocol stub enforcement test
+       441  # ---------------------------------------------------------------------------
+       442  000442	
+       443  000443	
+       444  class TestPhaseProtocol:
+       445  def test_stub_raises_not_implemented(self) -> None:
+       446  from bio_extraction.phases.phase1_acquisition import Phase1Acquisition
+       447  000447	
+       448  phase = Phase1Acquisition()
+       449  seed = PhaseOneInput(source=DocumentSource.LOCAL, local_path=Path("/tmp/fake.pdf"))
+       450  with pytest.raises(NotImplementedError):
+       451  phase.run(seed)
+       452  000452	
+       453  def test_phase_name_property(self) -> None:
+       454  from bio_extraction.phases.phase1_acquisition import Phase1Acquisition
+       455  from bio_extraction.phases.phase2_classification import Phase2Classification
+
+================================================================================
+SECTION 11 — tests/integration/test_phase1_acquisition_integration.py
+  F821: enumerate_local_inputs undefined (line 161)
+================================================================================
+  [imports block — first 40 lines of tests/integration/test_phase1_acquisition_integration.py]
+--------------------------------------------------------------------------------
+000001	import pytest
+000002	import fitz
+000003	from pathlib import Path
+000004	from datetime import datetime
+000005	
+000006	from bio_extraction.phases.phase1_acquisition import AcquisitionPhase
+000007	from bio_extraction.contracts import PhaseOneInput, DocumentSource
+000008	
+000009	
+000010	# ---------------------------
+000011	# Helpers
+000012	# ---------------------------
+000013	
+000014	
+000015	def make_pdf(text: str, path: Path):
+000016	    doc = fitz.open()
+000017	    page = doc.new_page()
+000018	    page.insert_text((72, 72), text)
+000019	    doc.save(str(path))
+000020	    doc.close()
+000021	
+000022	
+000023	class FakeSettings:
+000024	    lang_score_threshold = 0.3
+000025	    cc_request_timeout = 5
+000026	
+000027	
+000028	# ---------------------------
+000029	# Fixture: patch settings
+000030	# ---------------------------
+000031	
+000032	
+000033	@pytest.fixture(autouse=True)
+000034	def patch_settings(monkeypatch):
+000035	    import bio_extraction.config as cfg
+000036	
+000037	    monkeypatch.setattr(cfg, "get_settings", lambda: FakeSettings())
+000038	
+000039	
+000040	# ---------------------------
+
+  FILE : tests/integration/test_phase1_acquisition_integration.py
+  LABEL: F821: enumerate_local_inputs
+  LINES: 149-164  (error @ 161)
+--------------------------------------------------------------------------------
+       297  make_pdf("Pan ur w roku", pdf_path)
+       298  
+       299  class Settings:
+       300  lang_score_threshold = 0.0
+       301  
+       302  # ensure everything passes
+       303  
+       304  
+       305  def test_enumerate_sorted(tmp_path):
+       306  (tmp_path / "b.pdf").write_bytes(b"x")
+       307  (tmp_path / "a.pdf").write_bytes(b"x")
+       308  
+       309  inputs = enumerate_local_inputs(tmp_path)
+       310  names = [i.local_path.name for i in inputs]
+       311  
+       312  assert names == ["a.pdf", "b.pdf"]
+
+================================================================================
+SECTION 12 — tests/unit/test_layout_phase_unit.py
+  F811: ClassificationResult re-imported (lines 4-5)
+  F821: LayoutPhase undefined (line 10)
+================================================================================
+  [imports block — first 40 lines of tests/unit/test_layout_phase_unit.py]
+--------------------------------------------------------------------------------
+000001	import pytest
+000002	import numpy as np
+000003	from unittest.mock import MagicMock
+000004	from bio_extraction.contracts import DocumentType, ClassificationResult
+000005	from bio_extraction.phases.phase2_classification import ClassificationResult
+000006	
+000007	
+000008	@pytest.fixture
+000009	def layout_phase():
+000010	    return LayoutPhase()
+000011	
+000012	
+000013	def test_detect_columns_single_column(layout_phase):
+000014	    # Create a "blank" image (high values represent white/empty space in grayscale)
+000015	    img = np.full((100, 100), 255, dtype=np.uint8)
+000016	    # The current logic returns the whole width if no valleys are found
+000017	    columns = layout_phase._detect_columns(img)
+000018	    assert columns == [(0, 100)]
+000019	
+000020	
+000021	def test_segment_entries_basic(layout_phase):
+000022	    # Create an image with two horizontal black bars (entries)
+000023	    # 0 = black (ink), 255 = white (background)
+000024	    img = np.full((100, 10), 255, dtype=np.uint8)
+000025	    img[10:20, :] = 0  # Entry 1
+000026	    img[40:60, :] = 0  # Entry 2
+000027	
+000028	    entries = layout_phase._segment_entries(img)
+000029	    # Expecting ranges roughly covering the "ink" blocks
+000030	    assert len(entries) >= 2
+000031	    assert entries[0][0] == 0
+000032	    assert entries[1][0] > 20
+000033	
+000034	
+000035	def test_run_skips_non_directory(layout_phase):
+000036	    doc = MagicMock(spec=ClassificationResult)
+000037	    doc.doc_type = DocumentType.OTHER  # Not a DIRECTORY
+000038	    result = layout_phase.run(doc)
+000039	    assert result is None
+
+  FILE : tests/unit/test_layout_phase_unit.py
+  LABEL: F811: duplicate ClassificationResult import
+  LINES: 1-16  (error @ 4)
+--------------------------------------------------------------------------------
+         1  import pytest
+         2  import numpy as np
+         3  from unittest.mock import MagicMock
+>>>      4  from bio_extraction.contracts import DocumentType, ClassificationResult
+         5  from bio_extraction.phases.phase2_classification import ClassificationResult
+         6  
+         7  
+         8  @pytest.fixture
+         9  def layout_phase():
+        10  return LayoutPhase()
+        11  
+        12  
+        13  def test_detect_columns_single_column(layout_phase):
+        14  # Create a "blank" image (high values represent white/empty space in grayscale)
+        15  img = np.full((100, 100), 255, dtype=np.uint8)
+        16  # The current logic returns the whole width if no valleys are found
+
+  FILE : tests/unit/test_layout_phase_unit.py
+  LABEL: F821: LayoutPhase undefined
+  LINES: 1-22  (error @ 10)
+--------------------------------------------------------------------------------
+         1  import pytest
+         2  import numpy as np
+         3  from unittest.mock import MagicMock
+         4  from bio_extraction.contracts import DocumentType, ClassificationResult
+         5  from bio_extraction.phases.phase2_classification import ClassificationResult
+         6  
+         7  
+         8  @pytest.fixture
+         9  def layout_phase():
+>>>     10  return LayoutPhase()
+        11  
+        12  
+        13  def test_detect_columns_single_column(layout_phase):
+        14  # Create a "blank" image (high values represent white/empty space in grayscale)
+        15  img = np.full((100, 100), 255, dtype=np.uint8)
+        16  # The current logic returns the whole width if no valleys are found
+        17  columns = layout_phase._detect_columns(img)
+        18  assert columns == [(0, 100)]
+        19  
+        20  
+        21  def test_segment_entries_basic(layout_phase):
+        22  # Create an image with two horizontal black bars (entries)
+
+================================================================================
+SECTION 13 — CheckpointEngine / AcquisitionResult / DeadLetterQueue definitions
+  (needed to understand correct call signatures)
+================================================================================
+  [grep: CheckpointEngine class + load method]
+--------------------------------------------------------------------------------
+./bio_extraction/checkpoint.py:34:class CheckpointEngine:
+./bio_extraction/checkpoint.py:104:    def load(self, phase_name: str, doc_id: str, model_class: type[T]) -> T | None:
+
+  [grep: class AcquisitionResult]
+--------------------------------------------------------------------------------
+./bio_extraction/contracts.py:129:class AcquisitionResult(BaseModel):
+
+  [grep: class DeadLetterQueue]
+--------------------------------------------------------------------------------
+./bio_extraction/dead_letter.py:36:class DeadLetterQueue:
+
+  [grep: class ResolutionSettings]
+--------------------------------------------------------------------------------
+./bio_extraction/config.py:69:class ResolutionSettings(BaseModel):
+
+================================================================================
+Done. Pipe output to a file: bash fetch_error_snippets.sh > snippets.txt
+================================================================================

@@ -22,6 +22,16 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
+from bio_extraction.checkpoint import CheckpointEngine
+from bio_extraction.contracts import (
+    AcquisitionResult,
+    ClassificationResult,
+    LayoutResult,
+    PhaseOneInput,
+    DocumentSource,
+)
+from bio_extraction.dead_letter import DeadLetterQueue
+from bio_extraction.exceptions import CheckpointError, PhaseError, PipelineError
 
 _NOW = datetime(2024, 3, 15, 12, 0, 0, tzinfo=timezone.utc)
 _MINIMAL_PDF = b"%PDF-1.4\n%%EOF"

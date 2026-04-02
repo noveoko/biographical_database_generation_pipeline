@@ -28,6 +28,7 @@ Dependency contracts
 
 from __future__ import annotations
 
+from pathlib import Path
 import hashlib
 import json
 import re
@@ -181,7 +182,9 @@ class ExtractionPhase(PhaseProtocol[OCRResult, ExtractionResult]):
         settings = get_settings()
         self._cfg = settings.extraction  # sub-config block for this phase
 
-        self._cache: PatternCache = pattern_cache or PatternCache()
+        self._cache: PatternCache = pattern_cache or PatternCache(
+            Path(self._cfg.pattern_cache_path)
+        )
         self._bloom: SurnameBloomFilter = bloom_filter or SurnameBloomFilter()
 
         # Lazily-populated map: fingerprint → [raw_text, …] for the current
@@ -602,7 +605,7 @@ class ExtractionPhase(PhaseProtocol[OCRResult, ExtractionResult]):
                 return
 
         # --- Store in cache -----------------------------------------------
-        self._cache.set(fingerprint, compiled)
+        self._cache.save(fingerprint, compiled)
         self._log.info(
             "slice=%s fingerprint=%s — cached new regex pattern",
             slice_id,
@@ -981,3 +984,6 @@ if __name__ == "__main__":
     print("[OK] _coerce_to_list handles str, list, and None\n")
 
     print("=== All smoke tests passed ✓ ===")
+
+# Public alias used by test_e2e_pipeline.py
+Phase5Extraction = ExtractionPhase

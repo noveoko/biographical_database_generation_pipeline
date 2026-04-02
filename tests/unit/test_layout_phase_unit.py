@@ -2,7 +2,7 @@ import pytest
 import numpy as np
 from unittest.mock import MagicMock
 from bio_extraction.contracts import DocumentType, ClassificationResult
-from bio_extraction.phases.phase2_classification import ClassificationResult
+from bio_extraction.phases.phase3_layout import LayoutPhase
 
 
 @pytest.fixture

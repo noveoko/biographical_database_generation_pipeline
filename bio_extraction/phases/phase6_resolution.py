@@ -172,7 +172,7 @@ class ResolutionPhase(PhaseProtocol[ExtractionResult, ResolutionResult]):
         candidates = cursor.fetchall()
 
         best_score = 0.0
-        best_id = None
+        best_id: Optional[int] = None
 
         for pid, s_norm, g_names_json in candidates:
             score = Levenshtein.ratio(norm_surname, s_norm)
@@ -201,12 +201,13 @@ class ResolutionPhase(PhaseProtocol[ExtractionResult, ResolutionResult]):
             ),
         )
         self.conn.commit()
+        assert cursor.lastrowid is not None, "INSERT returned no lastrowid"
         return cursor.lastrowid, True, None
 
     def _pick_best_given_name_match(self, rows, given_names: List[str]) -> int:
         """Pick best candidate based on Jaccard similarity."""
         target = set(given_names)
-        best_score = -1
+        best_score: float = -1.0
         best_id = rows[0][0]
 
         for pid, g_names_json in rows:
@@ -325,3 +326,6 @@ if __name__ == "__main__":
     )
 
     print(result.model_dump())
+
+# Public alias used by test_e2e_pipeline.py
+Phase6Resolution = ResolutionPhase

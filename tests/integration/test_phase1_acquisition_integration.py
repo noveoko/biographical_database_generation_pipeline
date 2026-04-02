@@ -3,7 +3,7 @@ import fitz
 from pathlib import Path
 from datetime import datetime
 
-from bio_extraction.phases.phase1_acquisition import AcquisitionPhase
+from bio_extraction.phases.phase1_acquisition import AcquisitionPhase, enumerate_local_inputs
 from bio_extraction.contracts import PhaseOneInput, DocumentSource
 
 

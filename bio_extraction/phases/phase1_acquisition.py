@@ -810,7 +810,7 @@ if __name__ == "__main__":
 
         _original = _cfg.get_settings
         # Fixed lambda to accept arguments if the real get_settings does
-        _cfg.get_settings = lambda *args, **kwargs: _FakeSettings()
+        _cfg.get_settings = lambda *args, **kwargs: _FakeSettings()  # type: ignore[assignment]
 
         try:
             phase = AcquisitionPhase()
@@ -872,3 +872,6 @@ if __name__ == "__main__":
         print(f"✓  enumerate_local_inputs raises AcquisitionError for bad dir: {exc}")
 
     print("\n=== All smoke tests passed ===")
+
+# Public alias used by test_e2e_pipeline.py
+Phase1Acquisition = AcquisitionPhase

@@ -38,6 +38,11 @@ class SurnameBloomFilter:
     DEFAULT_CAPACITY = 200_000
     DEFAULT_ERROR_RATE = 0.01
 
+    # mypy requires explicit annotations when attrs are set in branches
+    size: int
+    hash_count: int
+    bit_array: bitarray
+
     def __init__(self, bloom_path: Path | None = None):
         """Load from disk if provided, otherwise initialize empty filter."""
         if bloom_path:
